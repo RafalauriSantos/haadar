@@ -32,5 +32,5 @@ The repository intentionally evolves in small, reviewable steps:
 
 ## Current status
 
-Architecture definition. See [`docs/specs/SPEC-001-haadar-architecture-and-engineering-constraints.md`](docs/specs/SPEC-001-haadar-architecture-and-engineering-constraints.md) once it is added and approved.
+Architecture definition. [`SPEC-001 — Haadar Architecture & Engineering Constraints`](docs/specs/SPEC-001-haadar-architecture-and-engineering-constraints.md) is proposed for review. Implementation planning remains blocked until it is approved.
 
