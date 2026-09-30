@@ -1,5 +1,8 @@
 # Haadar MVP Implementation Plan
 
+> Historical implementation record: this plan was executed with a 90-minute
+> cadence. The current approved cadence is hourly; see SPEC-001 and Checklist 2.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the first verifiable Haadar slice from a scheduled 90-minute discovery round to persisted, observable, idempotent discovery work while preserving Free-First operation.

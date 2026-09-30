@@ -26,7 +26,7 @@ Um dry-run não comprova execução de Cron, entrega de Queue, custo zero, envio
 
 ## 2. Direção e limites desta fase
 
-- Preservar Cloudflare, backend-only, rodadas de 90 minutos e Free-First da SPEC-001.
+- Preservar Cloudflare, backend-only, rodadas horárias e Free-First da SPEC-001.
 - Começar por um ATS público com resposta estruturada. Greenhouse é a proposta inicial, condicionada à validação da documentação e de um board público no Marco 5; RSS é alternativa se houver incompatibilidade documentada.
 - Usar um adapter por ATS e um registro de boards. Não criar um coletor por empresa.
 - Preferir Telegram como primeiro canal, sujeito à escolha do destino pelo usuário. Não reutilizar credenciais ou destinatários de outro projeto por inferência.
@@ -67,7 +67,7 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** novas migrations `0002_discovery_reliability.sql`, `src/storage/d1.ts`, `src/domain/{types,ids}.ts`, `src/discovery/round-coordinator.ts`, `tests/integration/discovery.test.ts`.
 
-- [x] Definir slots UTC de 90 minutos com âncora 00:00; validar datas inválidas, virada de dia e equivalência de fusos.
+- [x] Definir slots UTC horários com âncora 00:00; validar datas inválidas, virada de dia e equivalência de fusos.
 - [x] Tornar a serialização de partes da chave não ambígua, inclusive quando o separador aparece no conteúdo.
 - [x] Retornar o round persistido em `createOrGetRound`, preservando revisão do portfólio e orçamento da primeira admissão.
 - [x] Persistir snapshot imutável do portfólio e planos de tarefas na mesma unidade transacional de criação do round.
@@ -221,7 +221,7 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 - [ ] Confirmar produtor e consumidor remotos, task terminal, vaga real, decisão persistida, outbox enviada e recebimento.
 - [ ] Repetir o mesmo slot/task e comprovar não duplicação; observar falha transitória controlada em ambiente isolado.
 - [ ] Registrar evidência de execução remota da Queue; Queue local com D1 remoto não substitui esta etapa.
-- [ ] Observar pelo menos duas rodadas agendadas consecutivas e 24 horas de uso: 16 slots esperados, incluindo skips justificados. Não marcar a janela concluída antes de transcorrida.
+- [ ] Observar pelo menos duas rodadas agendadas consecutivas e 24 horas de uso: 24 slots esperados, incluindo skips justificados. Não marcar a janela concluída antes de transcorrida.
 - [ ] Conferir uso real disponível e estimativas, alertas de quota, margem e inexistência de dependência paga; registrar limitações da visibilidade de faturamento.
 - [ ] Registrar resultado de amostra manual de relevância e vagas perdidas conhecidas, sem inventar recall.
 

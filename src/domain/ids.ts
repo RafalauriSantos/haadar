@@ -1,7 +1,7 @@
 export function roundSlotFor(scheduledAt: Date): string {
   const instant = scheduledAt.getTime();
   if (!Number.isFinite(instant)) throw new RangeError("scheduledAt must be a valid date");
-  const slotMs = 90 * 60 * 1_000;
+  const slotMs = 60 * 60 * 1_000;
   return new Date(Math.floor(instant / slotMs) * slotMs).toISOString();
 }
 

@@ -7,7 +7,7 @@ workers_dev = true
 enabled = true
 
 [triggers]
-crons = ["0 */3 * * *", "30 1-23/3 * * *"]
+crons = ["0 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -47,7 +47,7 @@ workers_dev = true
 enabled = true
 
 [env.production.triggers]
-crons = ["0 */3 * * *", "30 1-23/3 * * *"]
+crons = ["0 * * * *"]
 
 [[env.production.d1_databases]]
 binding = "DB"

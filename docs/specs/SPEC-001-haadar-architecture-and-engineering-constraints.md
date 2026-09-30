@@ -1,5 +1,8 @@
 # SPEC-001 — Haadar Architecture & Engineering Constraints
 
+> Amendment 30/09/2026: the approved cadence is hourly. Earlier 90-minute
+> references are superseded by this decision.
+
 - **Status:** Approved by user
 - **Date:** 2026-09-30
 - **Decision type:** Foundational architecture
@@ -8,7 +11,7 @@
 
 ## 1. Purpose
 
-Haadar is a backend-only job discovery system that searches a controlled portfolio of queries every 90 minutes, captures job evidence from multiple sources, identifies new or unusually early opportunities, and emits useful alerts without requiring paid infrastructure.
+Haadar is a backend-only job discovery system that searches a controlled portfolio of queries every hour, captures job evidence from multiple sources, identifies new or unusually early opportunities, and emits useful alerts without requiring paid infrastructure.
 
 Its primary outcome is not “collect as many vacancies as possible.” It is to discover relevant opportunities early, reproducibly, and within a fixed free-tier budget. The system must make it possible to explain where a vacancy came from, when it was first observed, how it was classified, why it was or was not alerted, and which resources the decision consumed.
 
@@ -18,7 +21,7 @@ The MVP is successful when it can run continuously, tolerate duplicate delivery 
 
 ### 2.1 In scope
 
-- Scheduled discovery rounds every 90 minutes.
+- Scheduled discovery rounds every hour.
 - A versioned Query Portfolio.
 - Source- and ATS-specific adapters.
 - Normalization into a canonical vacancy observation.
@@ -94,7 +97,7 @@ The system has no frontend dependency. Its usable outputs are outbound alerts an
 ### 4.1 Logical view
 
 ```text
-Cron (two schedules, one 90-minute cadence)
+Cron (one hourly schedule)
   -> Discovery Round Coordinator (Worker)
   -> D1: persist round and immutable query/adaptor plan
   -> Queue: bounded discovery tasks
@@ -111,12 +114,11 @@ Cron (two schedules, one 90-minute cadence)
 All stages -> structured operational events + budget counters in D1/logs
 ```
 
-### 4.2 Scheduling every 90 minutes
+### 4.2 Scheduling every hour
 
-A discovery round is due 16 times per UTC day. Because Cron Triggers express calendar schedules rather than an arbitrary 90-minute interval, the intended cadence is represented by two complementary schedules:
+A discovery round is due 24 times per UTC day. Cloudflare Cron Triggers express the hourly cadence with one UTC schedule:
 
-- on the hour every three hours;
-- at minute 30 on the alternating three-hour sequence.
+- at minute 0 of every hour: `0 * * * *`.
 
 The implementation plan must validate the exact Cloudflare cron expressions before bootstrap. Scheduling is at-least-once from Haadar's perspective: the coordinator derives a deterministic `round_slot` from the scheduled time, and a unique constraint ensures that duplicate invocations reuse the same round instead of creating duplicate work.
 
@@ -310,7 +312,7 @@ Initial target values are hypotheses to be calibrated with real runs. The non-ne
 
 **Advantages:** smallest initial surface and fewer services.
 
-**Rejected as the target architecture because:** one invocation couples scheduling, remote latency, parsing, persistence, scoring, and notification. Partial failure is difficult to isolate, source work competes for subrequests, and retries can repeat successful side effects. A thin coordinator plus bounded queue tasks better matches the 90-minute cycle and failure model.
+**Rejected as the target architecture because:** one invocation couples scheduling, remote latency, parsing, persistence, scoring, and notification. Partial failure is difficult to isolate, source work competes for subrequests, and retries can repeat successful side effects. A thin coordinator plus bounded queue tasks better matches the hourly cycle and failure model.
 
 The first executable milestone may still prove only that Cron starts a round; it must not grow into the monolith.
 
@@ -391,7 +393,7 @@ The first executable milestone may still prove only that Cron starts a round; it
 This specification is ready for implementation planning only when the user explicitly approves it and the following are true:
 
 - Purpose, MVP boundary, and the meaning of Cloudflare-only/free-only are unambiguous.
-- The 90-minute cadence and duplicate-schedule behavior are defined.
+- The hourly cadence and duplicate-schedule behavior are defined.
 - Every included platform component has a specific responsibility.
 - Every excluded platform component has a documented reason.
 - Query Portfolio, adapters, persistence-first, deduplication, Early Signal, Budget Guard, observability, and optional AI have explicit boundaries.
@@ -404,7 +406,7 @@ This specification is ready for implementation planning only when the user expli
 
 The eventual MVP must demonstrate, through tests and controlled deployment evidence, that:
 
-1. exactly one logical round exists for each admitted 90-minute slot despite duplicate invocation;
+1. exactly one logical round exists for each admitted hourly slot despite duplicate invocation;
 2. a round records its Query Portfolio revision and budget decision before distributing work;
 3. at least one real adapter persists normalized evidence before classification;
 4. queue redelivery and repeated adapter results do not create duplicate observations, vacancies, or alerts;

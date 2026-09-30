@@ -14,7 +14,7 @@ It is not a dashboard, crawler-at-any-cost, or general-purpose recruitment platf
 
 - Cloudflare-native runtime and managed services only.
 - Zero mandatory infrastructure spend on the MVP.
-- A discovery round starts every 90 minutes.
+- A discovery round starts every hour.
 - Backend-only: no frontend is required for the MVP.
 - Deterministic filtering and persistence come before optional AI enrichment.
 - Every external source is isolated behind an adapter.

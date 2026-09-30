@@ -27,7 +27,7 @@ describe("operational health and retention", () => {
 
     const summary = await getOperationalHealth(env.DB, now);
     expect(summary.latestTerminalRound).toEqual({ id: "health-round", status: "partial", finishedAt: "2026-10-06T11:00:00.000Z" });
-    expect(summary.roundsLast24Hours).toMatchObject({ expected: 16, observed: 1, terminal: 1, missing: 15 });
+    expect(summary.roundsLast24Hours).toMatchObject({ expected: 24, observed: 1, terminal: 1, missing: 23 });
     expect(summary).toMatchObject({ budgetState: "CONSERVATIVE", failingAdapters: 1, oldestQueuedWork: "2026-10-06T10:30:00.000Z", notificationHealth: "unknown" });
   });
 

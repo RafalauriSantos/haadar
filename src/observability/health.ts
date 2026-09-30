@@ -34,7 +34,7 @@ export async function getOperationalHealth(db: D1Database, now = new Date()): Pr
     db.prepare("SELECT COUNT(*) AS count FROM alert_intents WHERE status = 'failed'").first<CountRow>(),
     db.prepare("SELECT COUNT(*) AS count FROM alert_intents WHERE status = 'sent'").first<CountRow>(),
   ]);
-  const expected = 16;
+  const expected = 24;
   const pending = pendingAlerts?.count ?? 0;
   const failed = failedAlerts?.count ?? 0;
   const sent = sentAlerts?.count ?? 0;

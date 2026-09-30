@@ -22,7 +22,7 @@ delivery intent and Telegram provider message ID.
 ## Observation window
 
 Observe two consecutive scheduled rounds and a full 24-hour window before
-closing this phase. The expected cadence is sixteen 90-minute slots. Missing
+closing this phase. The expected cadence is twenty-four hourly slots. Missing
 slots require an explicit documented reason; local Queue evidence does not
 replace remote Queue evidence.
 
