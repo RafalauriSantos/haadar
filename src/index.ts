@@ -1,8 +1,10 @@
 import { FixtureAdapter } from "./adapters/fixtures";
-import { consume } from "./queue/consumer";
+import { consumeMessage } from "./queue/consumer";
 import type { DiscoveryTaskMessage } from "./queue/messages";
+import { parseMessage } from "./queue/messages";
 import { admitRound } from "./discovery/round-coordinator";
 import { markTaskPublished } from "./storage/d1";
+import { reconcileExpiredTaskLeases } from "./storage/tasks";
 
 export interface Env {
   DB?: D1Database;
@@ -19,6 +21,7 @@ const worker = {
 
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for scheduled discovery");
+    await reconcileExpiredTaskLeases(env.DB, new Date(controller.scheduledTime).toISOString());
     const admission = await admitRound({
       db: env.DB,
       scheduledAt: new Date(controller.scheduledTime),
@@ -48,14 +51,37 @@ const worker = {
     }
   },
 
-  async queue(batch: MessageBatch<DiscoveryTaskMessage>, env: Env): Promise<void> {
+  async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
     if (!env.DB) throw new Error("D1 binding is required for queue consumption");
-    await consume({
-      db: env.DB,
-      batch: batch.messages.map((message) => message.body),
-      adapters: { fixture: new FixtureAdapter() },
-      maxAttempts: 3
-    });
+    for (const message of batch.messages) {
+      const parsed = parseMessage(message.body);
+      if (!parsed.ok) {
+        await env.DB.prepare(
+          `INSERT INTO operational_events (event_key, event_type, payload_json, created_at)
+           VALUES (?, 'queue_message_terminal', ?, ?)
+           ON CONFLICT(event_key) DO NOTHING`,
+        ).bind(
+          `queue-message:${message.id}:invalid`,
+          JSON.stringify({ reason: parsed.reason, attempts: message.attempts }),
+          new Date().toISOString(),
+        ).run();
+        message.ack();
+        continue;
+      }
+      try {
+        const outcome = await consumeMessage({
+          db: env.DB,
+          task: parsed.value,
+          queueAttempts: message.attempts,
+          adapters: { fixture: new FixtureAdapter() },
+          maxAttempts: 4,
+        });
+        if (outcome.action === "ack") message.ack();
+        else message.retry({ delaySeconds: outcome.delaySeconds });
+      } catch {
+        message.retry({ delaySeconds: 60 });
+      }
+    }
   }
 };
 

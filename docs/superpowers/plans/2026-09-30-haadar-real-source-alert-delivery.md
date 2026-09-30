@@ -84,14 +84,14 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** `src/index.ts`, `src/queue/{consumer,messages}.ts`, `src/storage/tasks.ts`, `tests/integration/queue.test.ts`, `wrangler.toml`.
 
-- [ ] Validar schema e tamanho das mensagens antes de executar; mensagens inválidas têm motivo terminal.
-- [ ] Usar claim persistido com lease; task concluída não executa novamente após reinício ou outro batch.
-- [ ] Encaminhar resultado para `message.ack()` ou `message.retry()` individualmente; usar tentativas reais da Queue, sem confiar em `body.attempt` congelado.
-- [ ] Classificar `permanent`, `blocked` e `schema_changed` como terminais; `retryable` e `throttled` respeitam limite e backoff com jitter.
-- [ ] Não confirmar sucesso quando a persistência falha; registrar falha sem expor resposta remota ou credenciais.
-- [ ] Configurar tamanho/concurrency de batch, retries e rota de trabalho esgotado compatíveis com orçamento.
-- [ ] Persistir status de tasks e agregar round em completed/partial/deferred; reconciliar leases expirados e impedir round eternamente running.
-- [ ] Provar recuperação quando Queue expira mensagem: tarefas persistidas continuam recuperáveis dentro da política de staleness.
+- [x] Validar schema e tamanho das mensagens antes de executar; mensagens inválidas têm motivo terminal.
+- [x] Usar claim persistido com lease; task concluída não executa novamente após reinício ou outro batch.
+- [x] Encaminhar resultado para `message.ack()` ou `message.retry()` individualmente; usar tentativas reais da Queue, sem confiar em `body.attempt` congelado.
+- [x] Classificar `permanent`, `blocked` e `schema_changed` como terminais; `retryable` e `throttled` respeitam limite e backoff com jitter.
+- [x] Não confirmar sucesso quando a persistência falha; registrar falha sem expor resposta remota ou credenciais.
+- [x] Configurar tamanho/concurrency de batch, retries e rota de trabalho esgotado compatíveis com orçamento.
+- [x] Persistir status de tasks e agregar round em completed/partial/deferred; reconciliar leases expirados e impedir round eternamente running.
+- [x] Provar recuperação quando Queue expira mensagem: tarefas persistidas continuam recuperáveis dentro da política de staleness.
 
 **Testes:** duplicate delivery em batches separados, concorrência, crash após insert, 429, erro permanente, tentativas esgotadas e batch misto.
 **Aceite:** falha de uma task não perde as outras; retries são observáveis e rounds alcançam estado terminal.

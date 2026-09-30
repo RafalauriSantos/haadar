@@ -1,6 +1,6 @@
 import { idempotencyKey, roundSlotFor } from "../domain/ids";
 import type { BudgetState, DiscoveryRound, DiscoveryTask, QueryDefinition } from "../domain/types";
-import { claimTaskPublications, persistRoundPlan } from "../storage/d1";
+import { claimTaskPublications, persistRoundPlan, recoverStaleTaskPublications } from "../storage/d1";
 import { decideBudget, type UsageSnapshot } from "../budget/budget-guard";
 
 interface QueryPortfolioSnapshot {
@@ -16,6 +16,7 @@ interface RoundCoordinatorInput {
   adapterIds: string[];
   now?: Date;
   publicationLeaseMs?: number;
+  publicationStaleMs?: number;
 }
 
 export interface RoundAdmission {
@@ -63,6 +64,11 @@ export async function admitRound(input: RoundCoordinatorInput): Promise<RoundAdm
     portfolio: input.portfolio,
     snapshotHash,
     tasks,
+    now: now.toISOString(),
+  });
+  await recoverStaleTaskPublications(input.db, {
+    roundId: persisted.round.id,
+    staleBefore: new Date(now.getTime() - (input.publicationStaleMs ?? 5 * 24 * 60 * 60_000)).toISOString(),
     now: now.toISOString(),
   });
   const leaseToken = crypto.randomUUID();

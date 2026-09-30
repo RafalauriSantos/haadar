@@ -192,6 +192,21 @@ export async function markTaskPublished(
   return result.meta.changes === 1;
 }
 
+export async function recoverStaleTaskPublications(
+  db: D1Database,
+  input: { roundId: string; staleBefore: string; now: string },
+): Promise<number> {
+  const result = await db.prepare(
+    `UPDATE task_publications
+     SET status = 'pending', lease_token = NULL, lease_expires_at = NULL, updated_at = ?
+     WHERE status = 'published' AND published_at <= ?
+       AND task_id IN (
+         SELECT id FROM discovery_tasks WHERE round_id = ? AND status IN ('pending', 'retryable')
+       )`,
+  ).bind(input.now, input.staleBefore, input.roundId).run();
+  return result.meta.changes;
+}
+
 export async function createTaskIfAbsent(db: D1DatabaseLike, task: DiscoveryTask): Promise<void> {
   const now = new Date().toISOString();
   await db.prepare(

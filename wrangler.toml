@@ -21,6 +21,12 @@ binding = "HAADAR_DISCOVERY"
 
 [[queues.consumers]]
 queue = "haadar-discovery"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "haadar-discovery-dlq"
+max_concurrency = 2
+retry_delay = 30
 
 # Remote resources are opt-in. Plain `wrangler dev` always uses local emulation.
 [env.staging]
@@ -50,3 +56,9 @@ binding = "HAADAR_DISCOVERY"
 
 [[env.production.queues.consumers]]
 queue = "haadar-discovery"
+max_batch_size = 5
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "haadar-discovery-dlq"
+max_concurrency = 2
+retry_delay = 30

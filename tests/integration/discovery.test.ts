@@ -100,6 +100,17 @@ describe("reliable discovery identity", () => {
       now: new Date(time.getTime() + 5_000),
     });
     expect(afterPublish.tasks).toHaveLength(0);
+
+    const afterQueueStaleness = await admitRound({
+      db: env.DB,
+      scheduledAt: new Date("2026-10-01T06:00:00.000Z"),
+      portfolio: { ...portfolio, revision: "lease-v1", queries: portfolio.queries.slice(0, 1) },
+      usage,
+      adapterIds: ["fixture"],
+      now: new Date(time.getTime() + 6_000),
+      publicationStaleMs: 1_000,
+    });
+    expect(afterQueueStaleness.tasks).toHaveLength(1);
   });
 
   it("keeps one vacancy with multiple query occurrences and changing URLs", async () => {
