@@ -1,6 +1,6 @@
 # Checklist 2 — First Real Source & Alert Delivery
 
-**Status:** planejada; nenhum item de implementação concluído por este documento.
+**Status:** em execução; Marcos 1 e 2 concluídos e verificados.
 **Data:** 30/09/2026.
 **Base inspecionada:** commit `6849bc1` e SPEC-001 aprovada.
 **Objetivo:** descobrir uma vaga de uma fonte pública real, persistir sua evidência, avaliá-la, entregar um alerta no destino escolhido e demonstrar recuperação de falhas com consumo controlado.
@@ -67,14 +67,14 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** novas migrations `0002_discovery_reliability.sql`, `src/storage/d1.ts`, `src/domain/{types,ids}.ts`, `src/discovery/round-coordinator.ts`, `tests/integration/discovery.test.ts`.
 
-- [ ] Definir slots UTC de 90 minutos com âncora 00:00; validar datas inválidas, virada de dia e equivalência de fusos.
-- [ ] Tornar a serialização de partes da chave não ambígua, inclusive quando o separador aparece no conteúdo.
-- [ ] Retornar o round persistido em `createOrGetRound`, preservando revisão do portfólio e orçamento da primeira admissão.
-- [ ] Persistir snapshot imutável do portfólio e planos de tarefas na mesma unidade transacional de criação do round.
-- [ ] Criar publicação pendente/claim com lease para tarefas: falha após commit e antes de enviar deve ser recuperável; envio seguido de crash pode redeliver sem duplicar efeitos.
-- [ ] Separar vaga canônica de ocorrências por fonte/query/round; preservar todas as atribuições sem multiplicar oportunidades.
-- [ ] Resolver conflitos por ID de fonte, URL e fingerprint com retorno de identidade persistida. Similaridade incerta gera evidência de possível duplicata, não fusão silenciosa.
-- [ ] Migrar observations existentes preservando IDs usados pelas decisões e marcar origem sintética para excluir das métricas reais.
+- [x] Definir slots UTC de 90 minutos com âncora 00:00; validar datas inválidas, virada de dia e equivalência de fusos.
+- [x] Tornar a serialização de partes da chave não ambígua, inclusive quando o separador aparece no conteúdo.
+- [x] Retornar o round persistido em `createOrGetRound`, preservando revisão do portfólio e orçamento da primeira admissão.
+- [x] Persistir snapshot imutável do portfólio e planos de tarefas na mesma unidade transacional de criação do round.
+- [x] Criar publicação pendente/claim com lease para tarefas: falha após commit e antes de enviar deve ser recuperável; envio seguido de crash pode redeliver sem duplicar efeitos.
+- [x] Separar vaga canônica de ocorrências por fonte/query/round; preservar todas as atribuições sem multiplicar oportunidades.
+- [x] Resolver conflitos por ID de fonte, URL e fingerprint com retorno de identidade persistida. Similaridade incerta gera evidência de possível duplicata, não fusão silenciosa.
+- [x] Migrar observations existentes preservando IDs usados pelas decisões e marcar origem sintética para excluir das métricas reais.
 
 **Testes:** duas admissões simultâneas do mesmo slot; outra revisão no retry; falha entre persistência e envio; mesma vaga por duas queries; URL alterada com mesmo ID; duas vagas parecidas mas distintas; reaplicação de migrations sem perda.
 **Aceite:** um round lógico por slot, publicação recuperável e rastreabilidade de cada discovery no banco.

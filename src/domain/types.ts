@@ -22,6 +22,7 @@ export interface DiscoveryTask {
   adapterId: string;
   idempotencyKey: string;
   attempt: number;
+  publicationLeaseToken?: string;
 }
 
 export interface QueryDefinition {
@@ -49,4 +50,8 @@ export interface NormalizedObservation {
   observedAt: string;
   queryId: string;
   fingerprint: string;
+  fingerprintVersion?: string;
+  roundId?: string;
+  taskId?: string;
+  originKind?: "synthetic" | "real";
 }

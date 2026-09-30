@@ -1,4 +1,4 @@
-import { insertObservationFirst, recordOperationalEvent, type D1DatabaseLike } from "../storage/d1";
+import { persistCanonicalObservation, recordOperationalEvent } from "../storage/d1";
 import type { SourceAdapter } from "../adapters/adapter";
 import type { DiscoveryTask } from "../domain/types";
 import type { DiscoveryTaskMessage } from "./messages";
@@ -10,7 +10,7 @@ export interface ConsumerResult {
 }
 
 export interface ConsumerInput {
-  db: D1DatabaseLike;
+  db: D1Database;
   batch: DiscoveryTaskMessage[];
   adapters: Record<string, SourceAdapter>;
   maxAttempts: number;
@@ -41,7 +41,12 @@ export async function consume(input: ConsumerInput): Promise<ConsumerResult> {
     try {
       const adapterResult = await adapter.discover(message as DiscoveryTask);
       for (const observation of adapterResult.observations) {
-        await insertObservationFirst(input.db, observation);
+        await persistCanonicalObservation(input.db, {
+          ...observation,
+          roundId: message.roundId,
+          taskId: message.id,
+          originKind: observation.originKind ?? "synthetic",
+        });
       }
       for (const diagnostic of adapterResult.diagnostics) {
         await recordOperationalEvent(input.db, {

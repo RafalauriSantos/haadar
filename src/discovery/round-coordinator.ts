@@ -1,6 +1,6 @@
 import { idempotencyKey, roundSlotFor } from "../domain/ids";
 import type { BudgetState, DiscoveryRound, DiscoveryTask, QueryDefinition } from "../domain/types";
-import { createOrGetRound, createTaskIfAbsent } from "../storage/d1";
+import { claimTaskPublications, persistRoundPlan } from "../storage/d1";
 import { decideBudget, type UsageSnapshot } from "../budget/budget-guard";
 
 interface QueryPortfolioSnapshot {
@@ -9,11 +9,13 @@ interface QueryPortfolioSnapshot {
 }
 
 interface RoundCoordinatorInput {
-  db: Parameters<typeof createOrGetRound>[0];
+  db: D1Database;
   scheduledAt: Date;
   portfolio: QueryPortfolioSnapshot;
   usage: UsageSnapshot;
   adapterIds: string[];
+  now?: Date;
+  publicationLeaseMs?: number;
 }
 
 export interface RoundAdmission {
@@ -33,15 +35,12 @@ export async function admitRound(input: RoundCoordinatorInput): Promise<RoundAdm
     budgetState: decision.state,
     status: decision.admitEssential ? "planned" : "deferred"
   };
-  await createOrGetRound(input.db, round);
 
-  if (!decision.admitEssential) return { round, budgetState: decision.state, tasks: [] };
-
-  const admittedQueries = input.portfolio.queries.filter((query) => {
+  const admittedQueries = decision.admitEssential ? input.portfolio.queries.filter((query) => {
     if (!query.active || (query.cooldownUntil && query.cooldownUntil > input.scheduledAt.toISOString())) return false;
     if (query.family === "EXPERIMENTAL" && !decision.admitOptional) return false;
     return true;
-  });
+  }) : [];
   const tasks: DiscoveryTask[] = [];
   for (const query of admittedQueries) {
     for (const adapterId of input.adapterIds) {
@@ -54,9 +53,28 @@ export async function admitRound(input: RoundCoordinatorInput): Promise<RoundAdm
         idempotencyKey: taskKey,
         attempt: 0
       };
-      await createTaskIfAbsent(input.db, task);
       tasks.push(task);
     }
   }
-  return { round, budgetState: decision.state, tasks };
+  const snapshotHash = await idempotencyKey(["portfolio-snapshot", JSON.stringify(input.portfolio)]);
+  const now = input.now ?? new Date();
+  const persisted = await persistRoundPlan(input.db, {
+    round,
+    portfolio: input.portfolio,
+    snapshotHash,
+    tasks,
+    now: now.toISOString(),
+  });
+  const leaseToken = crypto.randomUUID();
+  const claimedTasks = await claimTaskPublications(input.db, {
+    roundId: persisted.round.id,
+    now: now.toISOString(),
+    leaseUntil: new Date(now.getTime() + (input.publicationLeaseMs ?? 5 * 60_000)).toISOString(),
+    leaseToken,
+  });
+  return {
+    round: persisted.round,
+    budgetState: persisted.round.budgetState,
+    tasks: claimedTasks,
+  };
 }
