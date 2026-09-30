@@ -247,19 +247,19 @@ git commit -m "feat: add scheduled discovery rounds"
 - `QueryPortfolio.admit(state)` returns prioritized query/adapter tasks.
 - `SourceAdapter.discover(task): Promise<AdapterResult>` returns normalized observations and diagnostics.
 
-- [ ] **Step 1: Test family filtering and priority ordering**
+- [x] **Step 1: Test family filtering and priority ordering**
 
 The test fixture must include one query from each family and assert that disabled, cooled-down, and budget-rejected queries are excluded while priority order is stable.
 
-- [ ] **Step 2: Define the adapter contract and failure taxonomy**
+- [x] **Step 2: Define the adapter contract and failure taxonomy**
 
 The result type must distinguish `retryable`, `permanent`, `throttled`, `blocked`, and `schema_changed` failures and must carry source identity, query identity, and observed time.
 
-- [ ] **Step 3: Implement a deterministic fixture adapter**
+- [x] **Step 3: Implement a deterministic fixture adapter**
 
 The fixture adapter returns two observations, one duplicate, and one retryable diagnostic so queue and persistence behavior can be tested without calling a real source.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```bash
 npm run typecheck
