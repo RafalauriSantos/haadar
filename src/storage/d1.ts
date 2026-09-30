@@ -1,11 +1,11 @@
 import type { DiscoveryRound, DiscoveryTask, NormalizedObservation } from "../domain/types";
 
-interface D1StatementLike {
+export interface D1StatementLike {
   bind(...values: unknown[]): D1StatementLike;
   run(): Promise<unknown>;
 }
 
-interface D1DatabaseLike {
+export interface D1DatabaseLike {
   prepare(query: string): D1StatementLike;
 }
 

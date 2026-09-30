@@ -281,25 +281,25 @@ git commit -m "feat: define query portfolio and adapter contracts"
 - `DiscoveryTaskMessage` contains `roundId`, `queryId`, `adapterId`, `idempotencyKey`, and `attempt`.
 - `consume(batch, env)` invokes the adapter, persists every normalized observation before classification, records diagnostics, and acknowledges only handled messages.
 
-- [ ] **Step 1: Test duplicate queue delivery**
+- [x] **Step 1: Test duplicate queue delivery**
 
 Deliver the same message twice and assert one task completion, one observation identity, and one operational completion event.
 
-- [ ] **Step 2: Test retryable and permanent failures**
+- [x] **Step 2: Test retryable and permanent failures**
 
 Retryable failures must remain retryable with bounded attempt metadata; permanent, blocked, and schema-changed failures must become explicit terminal outcomes without blocking other messages.
 
-- [ ] **Step 3: Implement the consumer with bounded batches**
+- [x] **Step 3: Implement the consumer with bounded batches**
 
 The consumer must use one adapter task per message, enforce response size/time limits, call `insertObservationFirst` before any decision function, and record source diagnostics without secrets.
 
-- [ ] **Step 4: Run focused and full verification**
+- [x] **Step 4: Run focused and full verification**
 
 Run: `npm test -- tests/queue/consumer.test.ts; npm test; npm run typecheck`
 
 Expected: focused tests and the complete suite pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/queue tests/queue src/index.ts wrangler.toml
