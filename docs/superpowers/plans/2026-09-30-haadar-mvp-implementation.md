@@ -321,19 +321,19 @@ git commit -m "feat: distribute discovery tasks through Queue"
 - `heuristicScore(observation, evidence): HeuristicScore`.
 - `finalDecision(input): FinalDecision`.
 
-- [ ] **Step 1: Test deterministic rejection and Early Signal admission**
+- [x] **Step 1: Test deterministic rejection and Early Signal admission**
 
 An observation that fails a required exclusion must produce no Early Signal. A new eligible observation must produce one provisional Early Signal with a stable idempotency key.
 
-- [ ] **Step 2: Test the full ordered pipeline**
+- [x] **Step 2: Test the full ordered pipeline**
 
 Assert the order `persisted observation -> deterministic gate -> Early Signal -> enrichment boundary -> heuristic score -> optional AI boundary -> Final Decision` and assert that repeated finalization does not create a duplicate alert.
 
-- [ ] **Step 3: Implement explainable reason codes**
+- [x] **Step 3: Implement explainable reason codes**
 
 Every gate, score, Early Signal, and Final Decision must include rule version, evidence fields, and a reason code. Unknown publication time must never be converted into a claimed publication timestamp.
 
-- [ ] **Step 4: Run tests and commit**
+- [x] **Step 4: Run tests and commit**
 
 ```bash
 npm run typecheck
