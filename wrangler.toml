@@ -14,6 +14,7 @@ binding = "DB"
 database_name = "haadar"
 database_id = "6e390e86-1164-413b-aec6-f48c1dc4b290"
 migrations_dir = "migrations"
+remote = true
 
 [[queues.producers]]
 queue = "haadar-discovery"

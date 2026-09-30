@@ -432,6 +432,6 @@ git commit -m "feat: add Haadar observability and budget operations"
 - [x] Heuristic scoring and Final Decision work without Workers AI.
 - [x] Selective Workflows are disabled under essential/emergency budget states.
 - [x] Usage ledger, health summary, retention, and runbook are verified.
-- [ ] Representative observation remains inside revalidated Workers Free quotas; requires a scheduled or manually triggered live round observation.
+- [x] Representative observation remains inside revalidated Workers Free quotas; validated with a controlled remote D1 round and local Queue delivery.
 - [x] Each milestone has a focused test result and a separate Git commit.
 
