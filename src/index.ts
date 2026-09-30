@@ -84,6 +84,18 @@ const worker = {
         return Response.json({ error: "dispatch_failed", errorName }, { status: 500 });
       }
     }
+    if (pathname === "/admin/telegram-test" && request.method === "POST") {
+      if (!env.ADMIN_TRIGGER_TOKEN || request.headers.get("authorization") !== `Bearer ${env.ADMIN_TRIGGER_TOKEN}`) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_DESTINATION) {
+        return Response.json({ error: "delivery_not_configured" }, { status: 503 });
+      }
+      const result = await createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION).send(
+        "Haadar: teste controlado do Worker para o canal de alertas.",
+      );
+      return Response.json({ delivery: result.kind });
+    }
     return new Response("Not found", { status: 404 });
   },
 
