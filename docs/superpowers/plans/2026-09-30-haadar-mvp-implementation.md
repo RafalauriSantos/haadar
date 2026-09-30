@@ -208,23 +208,23 @@ git commit -m "feat: persist discovery rounds and observations in D1"
 - `budgetState(usage, ceilings): BudgetState` returns `NORMAL`, `CONSERVATIVE`, `ESSENTIAL`, or `EMERGENCY`.
 - `scheduled(controller, env, ctx)` calls the coordinator with the scheduled time and does not perform source fetching.
 
-- [ ] **Step 1: Test duplicate scheduled invocation**
+- [x] **Step 1: Test duplicate scheduled invocation**
 
 Two invocations with the same scheduled instant must return the same `round_id`, create one round, and enqueue no duplicate task identities.
 
-- [ ] **Step 2: Test Budget Guard transitions**
+- [x] **Step 2: Test Budget Guard transitions**
 
 Assert that usage below 70% is `NORMAL`, usage from 70% through 85% is `CONSERVATIVE`, usage at or above 85% is `ESSENTIAL`, and usage at the configured emergency ceiling produces `EMERGENCY` with nonessential admission disabled.
 
-- [ ] **Step 3: Implement coordinator admission**
+- [x] **Step 3: Implement coordinator admission**
 
 The coordinator must snapshot the active Query Portfolio revision, record the budget state, create the round transactionally, and produce bounded task messages only for admitted query/adapter pairs.
 
-- [ ] **Step 4: Validate the two Cron expressions against Wrangler documentation**
+- [x] **Step 4: Validate the two Cron expressions against Wrangler documentation**
 
 Configure the two expressions that represent the 90-minute UTC cadence, run `wrangler deploy --dry-run`, and record the accepted expressions in `wrangler.toml` comments and the test fixture.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 ```bash
 npm run typecheck

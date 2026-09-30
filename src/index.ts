@@ -1,4 +1,6 @@
-export interface Env {}
+export interface Env {
+  DB?: D1Database;
+}
 
 const worker = {
   async fetch(request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
