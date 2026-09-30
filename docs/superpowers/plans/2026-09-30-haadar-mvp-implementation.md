@@ -170,19 +170,19 @@ git commit -m "feat: define Haadar discovery domain contracts"
 - `insertObservationFirst(db, observation)` persists normalized evidence before decisions.
 - `recordOperationalEvent(db, event)` stores bounded structured diagnostics.
 
-- [ ] **Step 1: Write migration-level tests for uniqueness and persist-first ordering**
+- [x] **Step 1: Write migration-level tests for uniqueness and persist-first ordering**
 
 The test must insert the same round twice and assert one row, insert the same task twice and assert one row, then insert an observation and assert its `persisted_at` exists before any decision row is accepted.
 
-- [ ] **Step 2: Create the schema**
+- [x] **Step 2: Create the schema**
 
 The migration must include indexed tables `discovery_rounds`, `discovery_tasks`, `observations`, `decisions`, and `operational_events`; unique keys for `round_slot`, task idempotency, source identity/canonical URL/fingerprint, and alert outbox idempotency; and UTC timestamps stored as ISO text.
 
-- [ ] **Step 3: Implement parameterized D1 repository functions**
+- [x] **Step 3: Implement parameterized D1 repository functions**
 
 Every query must bind values, select only needed columns, and return typed results. No repository function may scan an unbounded table for a hot-path lookup.
 
-- [ ] **Step 4: Run local D1 verification and commit**
+- [x] **Step 4: Run local D1 verification and commit**
 
 Run: `npm run typecheck; npm test`
 

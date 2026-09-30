@@ -4,3 +4,9 @@ compatibility_date = "2026-09-30"
 
 [observability]
 enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "haadar"
+database_id = "local-placeholder"
+migrations_dir = "migrations"
