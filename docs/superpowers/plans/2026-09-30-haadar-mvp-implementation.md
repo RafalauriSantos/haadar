@@ -40,7 +40,7 @@
 - Produces a Worker `fetch(request, env, ctx)` entry point and a `scheduled(controller, env, ctx)` entry point.
 - Produces a test command that runs without a Cloudflare account.
 
-- [ ] **Step 1: Add the minimal package and scripts**
+- [x] **Step 1: Add the minimal package and scripts**
 
 ```json
 {
@@ -63,7 +63,7 @@
 }
 ```
 
-- [ ] **Step 2: Add a smoke test for the health response**
+- [x] **Step 2: Add a smoke test for the health response**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -78,7 +78,7 @@ describe("health endpoint", () => {
 });
 ```
 
-- [ ] **Step 3: Implement only the health endpoint and empty scheduled handler**
+- [x] **Step 3: Implement only the health endpoint and empty scheduled handler**
 
 ```ts
 export default {
@@ -92,13 +92,13 @@ export default {
 };
 ```
 
-- [ ] **Step 4: Run verification**
+- [x] **Step 4: Run verification**
 
 Run: `npm install; npm run typecheck; npm test`
 
 Expected: typecheck succeeds and the smoke test passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json package-lock.json tsconfig.json wrangler.toml src/index.ts tests/smoke.test.ts .gitignore
