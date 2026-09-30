@@ -69,6 +69,15 @@ const worker = {
       if (Number.isNaN(scheduledAt.getTime())) return Response.json({ error: "invalid_scheduled_at" }, { status: 400 });
       return Response.json(await runDiscoveryRound(env, scheduledAt), { status: 202 });
     }
+    if (pathname === "/admin/dispatch" && request.method === "POST") {
+      if (!env.ADMIN_TRIGGER_TOKEN || request.headers.get("authorization") !== `Bearer ${env.ADMIN_TRIGGER_TOKEN}`) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      if (!env.DB || !env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_DESTINATION) {
+        return Response.json({ error: "delivery_not_configured" }, { status: 503 });
+      }
+      return Response.json({ delivery: await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION)) });
+    }
     return new Response("Not found", { status: 404 });
   },
 
