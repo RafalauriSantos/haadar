@@ -1,6 +1,6 @@
 # Checklist 2 — First Real Source & Alert Delivery
 
-**Status:** em execução; Marcos 1 a 8 concluídos e verificados localmente.
+**Status:** em execução; Marcos 1 a 9 concluídos e verificados localmente.
 **Data:** 30/09/2026.
 **Base inspecionada:** commit `6849bc1` e SPEC-001 aprovada.
 **Objetivo:** descobrir uma vaga de uma fonte pública real, persistir sua evidência, avaliá-la, entregar um alerta no destino escolhido e demonstrar recuperação de falhas com consumo controlado.
@@ -181,14 +181,14 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** `src/observability/{events,usage-ledger,health}.ts`, `src/maintenance/retention.ts`, `docs/runbooks/free-tier-operations.md`, testes de integração.
 
-- [ ] Implementar resumo consultando D1: último round terminal, cobertura 24h, budget, falhas, backlog e outbox.
-- [ ] Diferenciar liveness pública de diagnóstico autenticado; não expor dados operacionais pessoais em `/health`.
-- [ ] Medir brutas/únicas/exclusivas por query/fonte, elegíveis, sinais, alertas confirmados e latências com denominadores claros.
-- [ ] Registrar applications somente quando informado pelo usuário/fluxo autorizado; não inferir candidatura a partir de clique.
-- [ ] Usar logs com allowlist de campos e limites de tamanho, removendo URLs de bot/tokens e erros remotos brutos.
-- [ ] Proteger first-seen, identidade e evidências de alertas por relações explícitas no schema; não depender apenas de presença de decisão.
-- [ ] Executar retenção em lotes limitados; testar preservação de alertas e simular dry-run antes de execução remota.
-- [ ] Documentar indisponibilidade D1, Queue esgotada, origem bloqueada e envio ambíguo.
+- [x] Implementar resumo consultando D1: último round terminal, cobertura 24h, budget, falhas, backlog e outbox.
+- [x] Diferenciar liveness pública de diagnóstico autenticado; não expor dados operacionais pessoais em `/health`.
+- [x] Medir brutas/únicas/exclusivas por query/fonte, elegíveis, sinais, alertas confirmados e latências com denominadores claros.
+- [x] Registrar applications somente quando informado pelo usuário/fluxo autorizado; não inferir candidatura a partir de clique.
+- [x] Usar logs com allowlist de campos e limites de tamanho, removendo URLs de bot/tokens e erros remotos brutos.
+- [x] Proteger first-seen, identidade e evidências de alertas por relações explícitas no schema; não depender apenas de presença de decisão.
+- [x] Executar retenção em lotes limitados; testar preservação de alertas e simular dry-run antes de execução remota.
+- [x] Documentar indisponibilidade D1, Queue esgotada, origem bloqueada e envio ambíguo.
 
 **Aceite:** cada campo do resumo corresponde a consulta real; retenção tem teste de integridade e nenhuma métrica sintética mistura-se às reais.
 **Commit:** `feat: expose verified operational health and retention`.

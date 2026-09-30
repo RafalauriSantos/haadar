@@ -252,6 +252,18 @@ export interface OperationalEvent {
   payload: Record<string, unknown>;
 }
 
+const operationalPayloadKeys = new Set(["kind", "reason", "errorKind", "attempts", "count", "state"]);
+
+function safeOperationalPayload(payload: Record<string, unknown>): Record<string, string | number | boolean | null> {
+  const safe: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (!operationalPayloadKeys.has(key)) continue;
+    if (value === null || typeof value === "number" || typeof value === "boolean") safe[key] = value;
+    if (typeof value === "string") safe[key] = value.slice(0, 120);
+  }
+  return safe;
+}
+
 export async function recordOperationalEvent(db: D1DatabaseLike, event: OperationalEvent): Promise<void> {
   await db.prepare(
     `INSERT INTO operational_events
@@ -265,7 +277,7 @@ export async function recordOperationalEvent(db: D1DatabaseLike, event: Operatio
     event.taskId ?? null,
     event.queryId ?? null,
     event.adapterId ?? null,
-    JSON.stringify(event.payload),
+    JSON.stringify(safeOperationalPayload(event.payload)),
     new Date().toISOString(),
   ).run();
 }

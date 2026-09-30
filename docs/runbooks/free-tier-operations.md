@@ -35,6 +35,18 @@ impact and resolution are recorded here.
 
 The operational summary must answer: latest successful round, last 24-hour coverage, current Budget Guard state, failing adapters, oldest queued work, and notification health. No dashboard is required.
 
+`GET /health` is liveness only. The D1-derived diagnostic summary is available
+at `GET /health/operations` only with `Authorization: Bearer <OPERATIONS_TOKEN>`;
+the token is a Cloudflare secret and is never committed. Its counts include only
+real vacancy occurrences, never synthetic test fixtures. Query-level metrics
+use explicit denominators: raw occurrences, distinct vacancies, vacancies seen
+by exactly one query, eligible vacancies, Early Signals and confirmed sends.
+
+Run retention first with `dryRun: true`. It selects bounded batches and deletes
+only old operational events plus old synthetic observations with no legacy or
+canonical decision evidence. It does not purge alert intents, decision records,
+canonical vacancies or source provenance.
+
 ## Budget response
 
 - `NORMAL`: admit normal bounded work.
@@ -69,3 +81,11 @@ or Early Signal path.
 - Never retry a blocked or policy-prohibited source indefinitely.
 - Preserve the evidence and reason code for every alert.
 - Inspect the usage ledger before changing concurrency or query volume.
+- If D1 is unavailable, do not acknowledge Queue work; let Queue retry and
+  inspect the task lease after recovery.
+- If Queue retries are exhausted, preserve the terminal task and adapter reason;
+  investigate before replaying it.
+- If a source is blocked, treat it as a terminal policy outcome rather than
+  bypassing it with scraping.
+- If notification delivery is ambiguous, keep it visible as unknown; do not
+  blindly resend until the provider result is reconciled.

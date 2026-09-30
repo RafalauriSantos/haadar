@@ -7,6 +7,7 @@ import { markTaskPublished } from "./storage/d1";
 import { reconcileExpiredTaskLeases } from "./storage/tasks";
 import { recordUsage } from "./observability/usage-ledger";
 import { utcDay } from "./budget/reservations";
+import { getOperationalHealth } from "./observability/health";
 import { initialQueries } from "./portfolio/query-portfolio";
 import { pilotSources } from "./portfolio/sources";
 import type { EnrichmentWorkflowParams } from "./workflows/enrichment";
@@ -17,12 +18,20 @@ export interface Env {
   DB?: D1Database;
   HAADAR_DISCOVERY?: Queue<DiscoveryTaskMessage>;
   ENRICHMENT_WORKFLOW?: Workflow<EnrichmentWorkflowParams>;
+  OPERATIONS_TOKEN?: string;
 }
 
 const worker = {
-  async fetch(request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
-    if (new URL(request.url).pathname === "/health") {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === "/health") {
       return Response.json({ service: "haadar", status: "ok" });
+    }
+    if (pathname === "/health/operations") {
+      if (!env.DB || !env.OPERATIONS_TOKEN || request.headers.get("authorization") !== `Bearer ${env.OPERATIONS_TOKEN}`) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      return Response.json(await getOperationalHealth(env.DB));
     }
     return new Response("Not found", { status: 404 });
   },
