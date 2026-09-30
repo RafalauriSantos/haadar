@@ -133,13 +133,13 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos previstos para Greenhouse:** `src/adapters/greenhouse.ts`, `src/adapters/http.ts`, `src/normalization/vacancy.ts`, `tests/adapters/greenhouse.test.ts`, fixtures públicas minimizadas.
 
-- [ ] Implementar fetch com timeout, limite durante leitura do corpo, allowlist e validação de redirects.
-- [ ] Validar resposta e classificar 429/Retry-After, 5xx, 401/403, HTML inesperado, JSON inválido e schema alterado.
-- [ ] Implementar paginação/checkpoint quando a fonte exigir, com teto e indicação explícita de coleta parcial.
-- [ ] Normalizar texto, URLs e IDs estáveis; manter observedAt real e publication time somente quando fornecido com semântica conhecida.
-- [ ] Calcular fingerprint versionado e preservar evidência/proveniência mínima antes de decisões.
-- [ ] Substituir FixtureAdapter no registro de produção; fixtures só são ativadas em ambiente de teste explícito.
-- [ ] Executar uma coleta limitada da fonte real e registrar contagens e um exemplo público verificável sem enviar alerta ainda.
+- [x] Implementar fetch com timeout, limite durante leitura do corpo, allowlist e validação de redirects.
+- [x] Validar resposta e classificar 429/Retry-After, 5xx, 401/403, HTML inesperado, JSON inválido e schema alterado.
+- [x] Implementar paginação/checkpoint quando a fonte exigir, com teto e indicação explícita de coleta parcial.
+- [x] Normalizar texto, URLs e IDs estáveis; manter observedAt real e publication time somente quando fornecido com semântica conhecida.
+- [x] Calcular fingerprint versionado e preservar evidência/proveniência mínima antes de decisões.
+- [x] Substituir FixtureAdapter no registro de produção; fixtures só são ativadas em ambiente de teste explícito.
+- [x] Executar uma coleta limitada da fonte real e registrar contagens e um exemplo público verificável sem enviar alerta ainda.
 
 **Testes:** resposta vazia, campo ausente, payload grande, timeout, redirects não permitidos, repetição da coleta e mudanças de URL/descrição.
 **Aceite:** uma vaga real verificável chega ao D1; segunda coleta preserva identidade e adiciona atribuição quando necessário.

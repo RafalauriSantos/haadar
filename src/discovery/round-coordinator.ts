@@ -19,6 +19,7 @@ interface RoundCoordinatorInput {
   now?: Date;
   publicationLeaseMs?: number;
   publicationStaleMs?: number;
+  boardOnceAdapters?: boolean;
 }
 
 export interface RoundAdmission {
@@ -48,7 +49,13 @@ export async function admitRound(input: RoundCoordinatorInput): Promise<RoundAdm
   }).sort((left, right) => right.priority - left.priority) : [];
   const tasks: DiscoveryTask[] = [];
   const tasksPerSource = new Map<string, number>();
-  for (const query of admittedQueries) {
+  if (input.boardOnceAdapters && decision.admitEssential) {
+    for (const adapterId of input.adapterIds) {
+      const taskKey = await idempotencyKey(["task", roundId, "board-once", adapterId]);
+      tasks.push({ id: taskKey, roundId, queryId: `board:${adapterId}`, adapterId, idempotencyKey: taskKey, attempt: 0 });
+    }
+  }
+  for (const query of input.boardOnceAdapters ? [] : admittedQueries) {
     for (const adapterId of input.adapterIds) {
       if ((tasksPerSource.get(adapterId) ?? 0) >= freeFirstConfig.maxTasksPerSource) continue;
       const taskKey = await idempotencyKey(["task", roundId, query.id, adapterId]);

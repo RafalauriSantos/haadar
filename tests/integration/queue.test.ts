@@ -103,7 +103,7 @@ describe("persistent queue lifecycle", () => {
     await worker.queue(batch, { DB: env.DB } as never, ctx);
     const result = await getQueueResult(batch, ctx);
     expect(result.explicitAcks).toContain("invalid");
-    expect(result.retryMessages.map((item) => item.msgId)).toContain("valid");
+    expect(result.explicitAcks).toContain("valid");
   });
 
   it("bounds exponential retry delay with jitter", () => {

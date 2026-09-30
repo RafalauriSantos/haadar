@@ -1,4 +1,4 @@
-import { FixtureAdapter } from "./adapters/fixtures";
+import { GreenhouseAdapter } from "./adapters/greenhouse";
 import { consumeMessage } from "./queue/consumer";
 import type { DiscoveryTaskMessage } from "./queue/messages";
 import { parseMessage } from "./queue/messages";
@@ -7,6 +7,8 @@ import { markTaskPublished } from "./storage/d1";
 import { reconcileExpiredTaskLeases } from "./storage/tasks";
 import { recordUsage } from "./observability/usage-ledger";
 import { utcDay } from "./budget/reservations";
+import { initialQueries } from "./portfolio/query-portfolio";
+import { pilotSources } from "./portfolio/sources";
 
 export interface Env {
   DB?: D1Database;
@@ -28,19 +30,11 @@ const worker = {
       db: env.DB,
       scheduledAt: new Date(controller.scheduledTime),
       portfolio: {
-        revision: "portfolio-v1",
-        queries: [{
-          id: "fixture-role-backend",
-          revision: "1",
-          family: "ROLE",
-          terms: ["backend", "typescript"],
-          exclusions: [],
-          priority: 10,
-          estimatedCost: 1,
-          active: true
-        }]
+        revision: "portfolio-v2-greenhouse-pilot",
+        queries: initialQueries,
       },
-      adapterIds: ["fixture"]
+      adapterIds: pilotSources.filter((source) => source.active).map((source) => source.id),
+      boardOnceAdapters: true,
     });
     if (admission.tasks.length > 0) {
       await env.HAADAR_DISCOVERY.sendBatch(admission.tasks.map((task) => ({ body: task })));
@@ -77,11 +71,15 @@ const worker = {
         continue;
       }
       try {
+        const adapters = Object.fromEntries(pilotSources.map((source) => [
+          source.id,
+          new GreenhouseAdapter(source, initialQueries),
+        ]));
         const outcome = await consumeMessage({
           db: env.DB,
           task: parsed.value,
           queueAttempts: message.attempts,
-          adapters: { fixture: new FixtureAdapter() },
+          adapters,
           maxAttempts: 4,
         });
         if (outcome.action === "ack") message.ack();
