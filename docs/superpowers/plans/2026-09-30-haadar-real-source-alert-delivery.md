@@ -215,7 +215,7 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 **Arquivos:** configuração por ambiente, `docs/validation/phase-2-production.md`, runbooks e checklist.
 
 - [ ] Verificar plano da conta, quotas compartilhadas, limites atuais e secrets antes de ativar coleta.
-- [ ] Testar migrations sobre cópia local representativa e aplicar as novas migrations no ambiente alvo; não recriar banco existente.
+- [x] Testar migrations sobre cópia local representativa e aplicar as novas migrations no ambiente alvo; não recriar banco existente.
 - [ ] Publicar somente após `npm run check` aprovado e revisão do diff; registrar SHA e versão Cloudflare.
 - [ ] Executar round controlado por mecanismo administrativo autenticado com idempotência e limite de uso, ou aguardar Cron real. Não criar endpoint público de disparo.
 - [ ] Confirmar produtor e consumidor remotos, task terminal, vaga real, decisão persistida, outbox enviada e recebimento.

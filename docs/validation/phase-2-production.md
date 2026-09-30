@@ -1,7 +1,6 @@
 # Phase 2 — Production validation record
 
-**Status:** not started. This document is a procedure, not evidence that the
-production trial has happened.
+**Status:** preparation in progress. The production trial has not happened.
 
 ## Preconditions
 
@@ -32,7 +31,7 @@ replace remote Queue evidence.
 | Field | Value |
 | --- | --- |
 | Deployment SHA | pending |
-| Migration result | pending |
+| Migration result | 30/09/2026: migrations 0002 through 0007 applied remotely; a follow-up list returned no pending migrations |
 | Controlled round ID | pending |
 | Queue task terminal state | pending |
 | Alert intent / provider message ID | pending |
