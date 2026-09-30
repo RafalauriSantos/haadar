@@ -118,13 +118,13 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** `docs/sources/first-source.md`, `src/portfolio/sources.ts`, `src/portfolio/query-portfolio.ts`, `src/adapters/adapter.ts`.
 
-- [ ] Consultar documentação oficial do ATS e registrar URL, data, campos, paginação e política de acesso.
-- [ ] Selecionar um board público verificável e pequeno para o piloto; documentar limites de cobertura desse recorte.
-- [ ] Definir hosts permitidos, timeout, limite de bytes, páginas, registros e requests por task antes de qualquer coleta.
-- [ ] Modelar board/source e queries aplicáveis; ATS que lista board inteiro é buscado uma vez e atribuído a várias queries localmente.
-- [ ] Definir famílias BROAD/ROLE/STACK/CONTEXT/COMPANY/EXPERIMENTAL sem obrigar stack no título.
-- [ ] Registrar como title, descrição, URL, localidade, modelo de trabalho e timestamps serão mapeados; não converter updated_at em published_at.
-- [ ] Registrar perfil de relevância configurável: função, senioridade, localidade/remoto e exclusões. Não assumir dados ausentes.
+- [x] Consultar documentação oficial do ATS e registrar URL, data, campos, paginação e política de acesso.
+- [x] Selecionar um board público verificável e pequeno para o piloto; documentar limites de cobertura desse recorte.
+- [x] Definir hosts permitidos, timeout, limite de bytes, páginas, registros e requests por task antes de qualquer coleta.
+- [x] Modelar board/source e queries aplicáveis; ATS que lista board inteiro é buscado uma vez e atribuído a várias queries localmente.
+- [x] Definir famílias BROAD/ROLE/STACK/CONTEXT/COMPANY/EXPERIMENTAL sem obrigar stack no título.
+- [x] Registrar como title, descrição, URL, localidade, modelo de trabalho e timestamps serão mapeados; não converter updated_at em published_at.
+- [x] Registrar perfil de relevância configurável: função, senioridade, localidade/remoto e exclusões. Não assumir dados ausentes.
 
 **Aceite:** documento identifica uma fonte real acessível, contrato e orçamento; seleção é reproduzível e não depende de login/scraping proibido.
 **Commit:** `docs: define first public ATS source contract`.

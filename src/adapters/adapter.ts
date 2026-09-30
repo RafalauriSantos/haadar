@@ -15,5 +15,7 @@ export interface AdapterResult {
 
 export interface SourceAdapter {
   readonly id: string;
+  /** A board-oriented adapter fetches each source once and attributes locally. */
+  readonly fetchStrategy?: "board_once" | "query_once";
   discover(task: DiscoveryTask): Promise<AdapterResult>;
 }
