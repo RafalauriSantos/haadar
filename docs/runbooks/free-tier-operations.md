@@ -3,9 +3,33 @@
 ## Before a deployment
 
 1. Revalidate current Workers, Queues, D1, Workflows, and Workers AI free allowances against the official Cloudflare documentation.
-2. Replace the local D1 placeholder with a real database ID only after the resource is intentionally created.
-3. Apply migrations and run the complete test suite.
+2. Run `npm run check`; this command type-checks and tests, but never deploys.
+3. Apply migrations to the intended environment only after naming that environment explicitly.
 4. Confirm the Budget Guard ceilings reserve capacity for retries and control-plane work.
+
+## Environment boundaries
+
+| Intent | Command | D1 target | Cloudflare credentials |
+| --- | --- | --- | --- |
+| Unit and integration verification | `npm run check` | Disposable local D1 provided by Miniflare | Not required |
+| Focused database integration | `npm run test:integration` | Disposable local D1; migrations applied per test suite | Not required |
+| Local development | `npm run dev` | Local Wrangler emulation | Not required |
+| Staging preview | `npm run dev:remote` | No binding until staging resources are intentionally provisioned | Required |
+| Production migration | `npx wrangler d1 migrations apply haadar --remote --env production` | Production D1 | Required |
+| Production deploy | `npm run deploy:production` | Production bindings declared under `env.production` | Required |
+
+The top-level bindings are local defaults. Only `env.production` contains the
+existing production resource identifiers and sets `remote = true`. Staging is a
+separate named environment deliberately blocked from data access until dedicated
+resources are created; do not point it at production as a shortcut.
+
+## Toolchain security
+
+Tool versions are exact in `package.json` and the lockfile. On 30/09/2026 the
+project migrated from the deprecated Workers Vitest pool to the supported
+Cloudflare Vitest plugin. `npm audit` then reported zero known vulnerabilities.
+Any future nonzero audit result is a deployment blocker until its reachable
+impact and resolution are recorded here.
 
 ## Health check
 

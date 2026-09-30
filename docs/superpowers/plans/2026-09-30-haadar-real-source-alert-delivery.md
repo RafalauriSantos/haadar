@@ -53,12 +53,12 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 **Arquivos:** `package.json`, lockfile, `vitest.config.ts`, `tests/integration/`, `tests/helpers/`, `wrangler.toml`, runbook.
 **Depende de:** nenhuma tarefa de código desta fase.
 
-- [ ] Fixar versões compatíveis das ferramentas e revisar as vulnerabilidades reportadas; registrar resolução ou impacto e impedimentos para deploy.
-- [ ] Configurar testes com runtime Workers e D1 local real. Executar migrations em banco descartável por suíte.
-- [ ] Separar desenvolvimento, staging e produção; remover acesso remoto implícito no desenvolvimento padrão.
-- [ ] Introduzir scripts de verificação que parem em falhas e não façam deploy automaticamente.
-- [ ] Executar testes de constraints, foreign keys e rollback, sem substituir o banco por um gravador de SQL.
-- [ ] Documentar qual comando usa banco local e qual usa recursos remotos.
+- [x] Fixar versões compatíveis das ferramentas e revisar as vulnerabilidades reportadas; registrar resolução ou impacto e impedimentos para deploy.
+- [x] Configurar testes com runtime Workers e D1 local real. Executar migrations em banco descartável por suíte.
+- [x] Separar desenvolvimento, staging e produção; remover acesso remoto implícito no desenvolvimento padrão.
+- [x] Introduzir scripts de verificação que parem em falhas e não façam deploy automaticamente.
+- [x] Executar testes de constraints, foreign keys e rollback, sem substituir o banco por um gravador de SQL.
+- [x] Documentar qual comando usa banco local e qual usa recursos remotos.
 
 **Aceite:** testes não requerem token Cloudflare e não escrevem no D1 de produção; uma violação real de constraint faz o teste falhar.
 **Commit:** `test: add isolated Workers and D1 integration harness`.

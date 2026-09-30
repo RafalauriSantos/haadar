@@ -4,16 +4,21 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:integration": "vitest run tests/integration",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "dev:remote": "wrangler dev --remote --env staging",
+    "validate:staging": "wrangler deploy --dry-run --env staging",
+    "deploy:production": "wrangler deploy --env production",
+    "deploy": "wrangler deploy --env production"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "latest",
-    "@cloudflare/workers-types": "latest",
-    "typescript": "latest",
-    "vitest": "latest",
-    "wrangler": "latest"
+    "@cloudflare/vitest-plugin": "1.3.4",
+    "@cloudflare/workers-types": "5.20260930.2",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "wrangler": "4.145.0"
   }
 }
