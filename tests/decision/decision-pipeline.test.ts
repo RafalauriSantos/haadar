@@ -35,4 +35,12 @@ describe("decision pipeline", () => {
     const secondSignal = await earlySignal(observation, gate);
     expect(firstSignal?.idempotencyKey).toBe(secondSignal?.idempotencyKey);
   });
+
+  it("calculates freshness from age instead of timestamp presence", () => {
+    const now = new Date("2026-09-30T12:00:00.000Z");
+    expect(heuristicScore({ ...observation, publishedAt: "2026-09-01T00:00:00.000Z" }, query.terms, now).features.freshness).toBe(0);
+    expect(heuristicScore({ ...observation, publishedAt: "2026-10-01T00:00:00.000Z" }, query.terms, now).features.freshness).toBe(0);
+    expect(heuristicScore({ ...observation, publishedAt: "invalid" }, query.terms, now).features.freshness).toBe(0);
+    expect(heuristicScore({ ...observation, publishedAt: "2026-09-29T12:00:00.000Z" }, query.terms, now).features.freshness).toBe(1);
+  });
 });

@@ -4,6 +4,9 @@ import type { SourceAdapter } from "../adapters/adapter";
 import type { DiscoveryTask } from "../domain/types";
 import { recordUsage } from "../observability/usage-ledger";
 import { utcDay } from "../budget/reservations";
+import { evaluateAndPersist } from "../decision/pipeline";
+import { initialQueries } from "../portfolio/query-portfolio";
+import { defaultRelevanceProfile } from "../portfolio/sources";
 
 export type ConsumeAction =
   | { action: "ack"; outcome: "completed" | "terminal" | "already_terminal"; reason?: string }
@@ -55,12 +58,25 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
   try {
     const adapterResult = await adapter.discover(input.task);
     for (const observation of adapterResult.observations) {
-      await persistCanonicalObservation(input.db, {
+      const persistedObservation = {
         ...observation,
         roundId: input.task.roundId,
         taskId: input.task.id,
         originKind: observation.originKind ?? "synthetic",
-      });
+      };
+      const vacancyId = await persistCanonicalObservation(input.db, persistedObservation);
+      if (persistedObservation.originKind === "real") {
+        const discoveryQuery = initialQueries.find((query) => query.id === observation.queryId);
+        if (discoveryQuery) {
+          await evaluateAndPersist(input.db, {
+            vacancyId,
+            observation: persistedObservation,
+            discoveryQuery,
+            profile: defaultRelevanceProfile,
+            now,
+          });
+        }
+      }
     }
     for (const diagnostic of adapterResult.diagnostics) {
       await recordOperationalEvent(input.db, {

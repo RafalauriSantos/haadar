@@ -149,14 +149,14 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** `src/decision/pipeline.ts`, módulos de decisão existentes, `src/queue/consumer.ts`, `src/storage/decisions.ts`, testes de integração, migration incremental de evidências.
 
-- [ ] Conectar o consumidor ao pipeline somente depois da persistência confirmada.
-- [ ] Persistir gate, versões, evidências, score e decisão ligados à vaga/observation.
-- [ ] Separar aderência ao perfil da query que descobriu a vaga; query ampla não deve rejeitar oportunidade boa por ausência literal de termos.
-- [ ] Corrigir freshness: presença de publishedAt não significa vaga recente; testar idade com relógio injetado e timestamps futuros/inválidos.
-- [ ] Emitir Early Signal provisório somente para candidata que passe critério explícito, sem esperar todo o round.
-- [ ] Gravar decisão e intenção de notificação atomicamente; unicidade por vaga/canal/destinatário impede alertas indevidos cross-query.
-- [ ] Final Decision referencia o Early Signal; atualização do alerta existente é preferida a novo envio. Descarte posterior preserva histórico e motivo.
-- [ ] Provar fluxo até outbox com IA e Workflow indisponíveis.
+- [x] Conectar o consumidor ao pipeline somente depois da persistência confirmada.
+- [x] Persistir gate, versões, evidências, score e decisão ligados à vaga/observation.
+- [x] Separar aderência ao perfil da query que descobriu a vaga; query ampla não deve rejeitar oportunidade boa por ausência literal de termos.
+- [x] Corrigir freshness: presença de publishedAt não significa vaga recente; testar idade com relógio injetado e timestamps futuros/inválidos.
+- [x] Emitir Early Signal provisório somente para candidata que passe critério explícito, sem esperar todo o round.
+- [x] Gravar decisão e intenção de notificação atomicamente; unicidade por vaga/canal/destinatário impede alertas indevidos cross-query.
+- [x] Final Decision referencia o Early Signal; atualização do alerta existente é preferida a novo envio. Descarte posterior preserva histórico e motivo.
+- [x] Provar fluxo até outbox com IA e Workflow indisponíveis.
 
 **Testes:** exclusão, perfil aderente sem stack no título, vaga antiga com data, missing timestamp, reprocessamento com regra diferente, redelivery após decisão.
 **Aceite:** toda intenção de alerta tem evidência persistida e motivo; Early Signal não espera enrichment.

@@ -2,7 +2,7 @@ import type { NormalizedObservation, QueryDefinition } from "../domain/types";
 
 export interface GateResult {
   eligible: boolean;
-  reasonCode: "eligible" | "excluded_title" | "inactive_query" | "missing_identity";
+  reasonCode: "eligible" | "excluded_title" | "inactive_query" | "missing_identity" | "profile_mismatch";
   ruleVersion: string;
 }
 
