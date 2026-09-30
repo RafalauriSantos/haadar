@@ -198,11 +198,11 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 **Arquivos previstos para Telegram:** `src/notifications/{telegram,dispatcher,outbox}.ts`, migration incremental de entrega, testes e `docs/runbooks/alert-delivery.md`.
 
 - [ ] Confirmar canal, bot e destinatário para o piloto. Registrar somente nomes dos secrets; provisionar valores pelo mecanismo seguro da Cloudflare.
-- [ ] Definir cartão com título, empresa, localização, origem, link e indicação de provisional/final; limitar tamanho e escapar formatação.
-- [ ] Introduzir estados pending/sending/sent/retryable/failed/unknown, lease, tentativas, próxima tentativa e ID de mensagem do provedor.
-- [ ] Implementar dispatcher com claim atômico e orçamento; integração pode ocorrer no Worker/Workflow sem fila por etapa.
-- [ ] Validar sucesso pela resposta do provedor e persistir o message ID; mapear 429, destino inválido e falha transitória.
-- [ ] Tratar timeout após possível aceitação como unknown. Sem idempotency key no provedor, não prometer exactly-once nem reenviar cegamente.
+- [x] Definir cartão com título, empresa, localização, origem, link e indicação de provisional/final; limitar tamanho e escapar formatação.
+- [x] Introduzir estados pending/sending/sent/retryable/failed/unknown, lease, tentativas, próxima tentativa e ID de mensagem do provedor.
+- [x] Implementar dispatcher com claim atômico e orçamento; integração pode ocorrer no Worker/Workflow sem fila por etapa.
+- [x] Validar sucesso pela resposta do provedor e persistir o message ID; mapear 429, destino inválido e falha transitória.
+- [x] Tratar timeout após possível aceitação como unknown. Sem idempotency key no provedor, não prometer exactly-once nem reenviar cegamente.
 - [ ] Atualizar mensagem de Early Signal na conclusão quando o canal permitir; manter registro de tentativa e resultado.
 - [ ] Fazer um envio controlado ao destino aprovado e confirmar recebimento. Teste automatizado usa provedor simulado.
 

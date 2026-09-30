@@ -23,6 +23,8 @@ export interface ConsumerInput {
   now?: Date;
   random?: () => number;
   enrichmentWorkflow?: Workflow<EnrichmentWorkflowParams>;
+  alertChannel?: string;
+  alertDestinationKey?: string;
 }
 
 export async function consumeMessage(input: ConsumerInput): Promise<ConsumeAction> {
@@ -76,6 +78,8 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
             discoveryQuery,
             profile: defaultRelevanceProfile,
             now,
+            channel: input.alertChannel,
+            destinationKey: input.alertDestinationKey,
           });
           if (evaluation.outcome === "alert" && input.enrichmentWorkflow) {
             const round = await input.db.prepare("SELECT budget_state FROM discovery_rounds WHERE id = ?")

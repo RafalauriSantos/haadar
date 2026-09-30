@@ -8,6 +8,8 @@ import { reconcileExpiredTaskLeases } from "./storage/tasks";
 import { recordUsage } from "./observability/usage-ledger";
 import { utcDay } from "./budget/reservations";
 import { getOperationalHealth } from "./observability/health";
+import { createTelegramClient } from "./notifications/telegram";
+import { dispatchOne } from "./notifications/dispatcher";
 import { initialQueries } from "./portfolio/query-portfolio";
 import { pilotSources } from "./portfolio/sources";
 import type { EnrichmentWorkflowParams } from "./workflows/enrichment";
@@ -19,6 +21,8 @@ export interface Env {
   HAADAR_DISCOVERY?: Queue<DiscoveryTaskMessage>;
   ENRICHMENT_WORKFLOW?: Workflow<EnrichmentWorkflowParams>;
   OPERATIONS_TOKEN?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_DESTINATION?: string;
 }
 
 const worker = {
@@ -95,7 +99,12 @@ const worker = {
           adapters,
           maxAttempts: 4,
           enrichmentWorkflow: env.ENRICHMENT_WORKFLOW,
+          alertChannel: env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? "telegram" : undefined,
+          alertDestinationKey: env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? env.TELEGRAM_DESTINATION : undefined,
         });
+        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
+          await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION));
+        }
         if (outcome.action === "ack") message.ack();
         else message.retry({ delaySeconds: outcome.delaySeconds });
       } catch {
