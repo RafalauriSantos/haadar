@@ -76,7 +76,13 @@ const worker = {
       if (!env.DB || !env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_DESTINATION) {
         return Response.json({ error: "delivery_not_configured" }, { status: 503 });
       }
-      return Response.json({ delivery: await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION)) });
+      try {
+        return Response.json({ delivery: await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION)) });
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : "UnknownError";
+        console.error(JSON.stringify({ event: "admin_dispatch_failed", errorName }));
+        return Response.json({ error: "dispatch_failed", errorName }, { status: 500 });
+      }
     }
     return new Response("Not found", { status: 404 });
   },
