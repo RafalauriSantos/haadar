@@ -14,6 +14,12 @@ export async function dispatchOne(
   const nowIso = now.toISOString();
   const lease = crypto.randomUUID();
   await db.prepare(
+    `UPDATE notification_deliveries
+     SET state = 'unknown', last_error_kind = 'delivery_lease_expired',
+         lease_token = NULL, lease_expires_at = NULL, updated_at = ?
+     WHERE state = 'sending' AND lease_expires_at <= ?`,
+  ).bind(nowIso, nowIso).run();
+  await db.prepare(
     `INSERT INTO notification_deliveries (intent_key, state, created_at, updated_at)
      SELECT idempotency_key, 'pending', ?, ? FROM alert_intents
      WHERE channel = 'telegram' AND status = 'pending'

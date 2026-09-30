@@ -41,6 +41,19 @@ describe("recoverable notification dispatch", () => {
     expect(await env.DB.prepare("SELECT state FROM notification_deliveries WHERE intent_key = 'delivery-unknown'").first()).toMatchObject({ state: "unknown" });
   });
 
+  it("marks an expired sending lease as unknown before considering another intent", async () => {
+    await insertIntent("delivery-expired");
+    await env.DB.prepare(
+      `INSERT INTO notification_deliveries
+        (intent_key, state, lease_token, lease_expires_at, attempts, created_at, updated_at)
+       VALUES ('delivery-expired', 'sending', 'expired-lease', '2026-10-07T11:59:00.000Z', 1, ?, ?)`,
+    ).bind(now.toISOString(), now.toISOString()).run();
+    const client: TelegramClient = { send: async () => ({ kind: "sent", messageId: "43" }) };
+    await dispatchOne(env.DB, client, now);
+    expect(await env.DB.prepare("SELECT state, last_error_kind FROM notification_deliveries WHERE intent_key = 'delivery-expired'").first())
+      .toMatchObject({ state: "unknown", last_error_kind: "delivery_lease_expired" });
+  });
+
   it("formats a bounded plain-text card", () => {
     const card = formatTelegramAlert({ title: "*Backend*\nDeveloper", organization: "Acme", location: "Remote", source: "Greenhouse", url: "https://jobs.example/1", stage: "provisional" });
     expect(card).toContain("Sinal inicial");

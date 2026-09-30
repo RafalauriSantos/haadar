@@ -26,11 +26,14 @@ export function formatTelegramAlert(card: TelegramAlertCard): string {
 export function createTelegramClient(token: string, destination: string, fetcher: typeof fetch = fetch): TelegramClient {
   return {
     async send(text) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
       try {
         const response = await fetcher(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ chat_id: destination, text, disable_web_page_preview: true }),
+          signal: controller.signal,
         });
         const payload = await response.json().catch(() => null) as { ok?: boolean; result?: { message_id?: number }; parameters?: { retry_after?: number } } | null;
         if (response.status === 429) return { kind: "retryable" as const, retryAfterSeconds: payload?.parameters?.retry_after };
@@ -38,6 +41,8 @@ export function createTelegramClient(token: string, destination: string, fetcher
         return { kind: "sent" as const, messageId: String(payload.result.message_id) };
       } catch {
         return { kind: "unknown" as const };
+      } finally {
+        clearTimeout(timeout);
       }
     },
   };
