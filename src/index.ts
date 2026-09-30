@@ -23,6 +23,29 @@ export interface Env {
   OPERATIONS_TOKEN?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_DESTINATION?: string;
+  ADMIN_TRIGGER_TOKEN?: string;
+}
+
+async function runDiscoveryRound(env: Env, scheduledAt: Date): Promise<{ roundId: string; admittedTasks: number }> {
+  if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for scheduled discovery");
+  await reconcileExpiredTaskLeases(env.DB, scheduledAt.toISOString());
+  const admission = await admitRound({
+    db: env.DB,
+    scheduledAt,
+    portfolio: { revision: "portfolio-v2-greenhouse-pilot", queries: initialQueries },
+    adapterIds: pilotSources.filter((source) => source.active).map((source) => source.id),
+    boardOnceAdapters: true,
+  });
+  if (admission.tasks.length > 0) {
+    await env.HAADAR_DISCOVERY.sendBatch(admission.tasks.map((task) => ({ body: task })));
+    await Promise.all(admission.tasks.map(async (task) => {
+      if (!task.publicationLeaseToken) throw new Error("publication lease token is required");
+      const marked = await markTaskPublished(env.DB!, task.id, task.publicationLeaseToken);
+      if (!marked) throw new Error(`publication lease lost for task ${task.id}`);
+      await recordUsage(env.DB!, `task:${task.id}:queue-publish`, utcDay(scheduledAt), "queue_operations", 1);
+    }));
+  }
+  return { roundId: admission.round.id, admittedTasks: admission.tasks.length };
 }
 
 const worker = {
@@ -37,37 +60,20 @@ const worker = {
       }
       return Response.json(await getOperationalHealth(env.DB));
     }
+    if (pathname === "/admin/discovery" && request.method === "POST") {
+      if (!env.ADMIN_TRIGGER_TOKEN || request.headers.get("authorization") !== `Bearer ${env.ADMIN_TRIGGER_TOKEN}`) {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+      const requestedAt = new URL(request.url).searchParams.get("scheduledAt");
+      const scheduledAt = requestedAt ? new Date(requestedAt) : new Date();
+      if (Number.isNaN(scheduledAt.getTime())) return Response.json({ error: "invalid_scheduled_at" }, { status: 400 });
+      return Response.json(await runDiscoveryRound(env, scheduledAt), { status: 202 });
+    }
     return new Response("Not found", { status: 404 });
   },
 
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for scheduled discovery");
-    await reconcileExpiredTaskLeases(env.DB, new Date(controller.scheduledTime).toISOString());
-    const admission = await admitRound({
-      db: env.DB,
-      scheduledAt: new Date(controller.scheduledTime),
-      portfolio: {
-        revision: "portfolio-v2-greenhouse-pilot",
-        queries: initialQueries,
-      },
-      adapterIds: pilotSources.filter((source) => source.active).map((source) => source.id),
-      boardOnceAdapters: true,
-    });
-    if (admission.tasks.length > 0) {
-      await env.HAADAR_DISCOVERY.sendBatch(admission.tasks.map((task) => ({ body: task })));
-      await Promise.all(admission.tasks.map(async (task) => {
-        if (!task.publicationLeaseToken) throw new Error("publication lease token is required");
-        const marked = await markTaskPublished(env.DB!, task.id, task.publicationLeaseToken);
-        if (!marked) throw new Error(`publication lease lost for task ${task.id}`);
-        await recordUsage(
-          env.DB!,
-          `task:${task.id}:queue-publish`,
-          utcDay(new Date(controller.scheduledTime)),
-          "queue_operations",
-          1,
-        );
-      }));
-    }
+    await runDiscoveryRound(env, new Date(controller.scheduledTime));
   },
 
   async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
