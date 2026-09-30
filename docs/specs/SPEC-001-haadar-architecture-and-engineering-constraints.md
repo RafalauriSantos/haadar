@@ -1,6 +1,6 @@
 # SPEC-001 — Haadar Architecture & Engineering Constraints
 
-- **Status:** Proposed for user review
+- **Status:** Approved by user
 - **Date:** 2026-09-30
 - **Decision type:** Foundational architecture
 - **Scope:** MVP architecture and engineering constraints only
@@ -100,10 +100,12 @@ Cron (two schedules, one 90-minute cadence)
   -> Queue: bounded discovery tasks
   -> Source/ATS Adapters (Worker consumers)
   -> D1: persist normalized observations first
-  -> Deduplication + deterministic eligibility + Early Signal
-  -> D1: persist decisions and outbox records
-  -> selective Workflow for durable alert/enrichment sequences
-  -> optional Workers AI for bounded enrichment
+  -> Deduplication + Deterministic Gate
+  -> optional Early Signal alert
+  -> selective Workflow for durable enrichment/alert sequences
+  -> Enrichment + heuristic scoring
+  -> optional Workers AI
+  -> Final Decision + D1 outbox record
   -> notification channel
 
 All stages -> structured operational events + budget counters in D1/logs
@@ -140,7 +142,7 @@ A versioned set of search intents. Each query definition contains at least:
 - active state;
 - provenance explaining why the query exists.
 
-The portfolio is scheduled, not blindly replayed. Higher-value or under-sampled queries receive priority, while repeatedly low-yield queries can be cooled down. A round stores the exact portfolio revision and admitted tasks so results remain explainable after configuration changes.
+The portfolio is scheduled, not blindly replayed. Query families include `BROAD`, `ROLE`, `STACK`, `CONTEXT`, `COMPANY`, and `EXPERIMENTAL`. Stack terms are evidence for relevance, not a mandatory discovery entry point. Higher-value or under-sampled queries receive priority, while repeatedly low-yield queries can be cooled down. A round stores the exact portfolio revision and admitted tasks so results remain explainable after configuration changes. Each query is measurable through the funnel `jobs_found -> unique_jobs -> relevant_jobs -> alerts -> applications`.
 
 #### Source/ATS adapters
 
@@ -173,7 +175,7 @@ Cross-source similarity may mark likely duplicates, but it must not silently mer
 
 #### Early Signal
 
-Early Signal ranks how quickly and confidently Haadar found a vacancy. It is deterministic in the MVP and uses only known evidence:
+Early Signal is a provisional, fast alert for a vacancy that survives the first deterministic gate. It may be emitted during the current round, before the complete batch finishes, so a promising opportunity is not held behind expensive processing. It is deterministic in the MVP and uses only known evidence:
 
 - explicit source publication time, when trustworthy;
 - `first_seen_at` recorded by Haadar;
@@ -182,30 +184,30 @@ Early Signal ranks how quickly and confidently Haadar found a vacancy. It is det
 - query priority and deterministic eligibility;
 - confidence in timestamp and identity evidence.
 
-The system must distinguish “recently published” from “recently discovered.” If a source does not provide a trustworthy publication timestamp, Haadar may claim only that the vacancy is newly observed. Missing data must reduce confidence, not be invented.
+The system must distinguish “recently published” from “recently discovered.” If a source does not provide a trustworthy publication timestamp, Haadar may claim only that the vacancy is newly observed. Missing data must reduce confidence, not be invented. An Early Signal carries provisional status and an idempotency key; later enrichment and heuristic scoring produce a Final Decision without creating an unintended duplicate alert.
 
 #### Budget Guard
 
 The Budget Guard makes an admission decision before work is enqueued and again before optional stages. It tracks or conservatively estimates Workers requests, Queue operations, D1 reads/writes/storage, Workflow steps/storage, AI neurons, outbound requests, per-source rate limits, and retry reserve.
 
-Operating bands:
+Operating states:
 
-- **Green (<70% of the internal daily budget):** normal bounded operation.
-- **Amber (70–85%):** reduce low-priority queries, concurrency, and optional enrichment.
-- **Red (>=85%):** stop AI and optional Workflows; admit only essential retries and high-priority discovery if reserve permits.
-- **Stop threshold (configured below the platform limit):** create an explicit skipped/deferred outcome and admit no new nonessential work.
+- **NORMAL (<70% of the internal daily budget):** normal bounded operation.
+- **CONSERVATIVE (70–85%):** reduce experimental queries, concurrency, and optional enrichment.
+- **ESSENTIAL (>=85%):** stop AI and optional Workflows; admit only essential retries and high-priority discovery if reserve permits.
+- **EMERGENCY (configured below the platform limit):** create explicit skipped/deferred outcomes and admit no new nonessential work.
 
 Daily counters follow the relevant provider reset boundary, normally 00:00 UTC. Estimation errors must fail conservative.
 
 #### Selective Workflows
 
-Workflows are justified only when an operation needs durable multi-step state, independent retries, waiting, or compensation. Candidate use cases are a notification sequence with retry/backoff or a bounded enrichment sequence that must survive restarts.
+Workflows are justified only when an operation needs durable multi-step state, independent retries, waiting, or compensation. Candidate use cases are a notification sequence with retry/backoff or a bounded enrichment sequence that must survive restarts after an Early Signal. They are not required for every discovered vacancy.
 
 Workflows are not the default orchestration engine for discovery records. Simple queue-consumer operations remain ordinary Worker handlers to preserve the 3,000-step daily allowance and reduce complexity.
 
 #### Optional Workers AI
 
-Workers AI may enrich a small set of already persisted, deduplicated, deterministically eligible vacancies. Allowed tasks may include structured extraction or a secondary relevance explanation. It must never be required for collection, identity, deduplication, quota control, or basic alert delivery.
+Workers AI may enrich a small set of already persisted, deduplicated, deterministically eligible vacancies after heuristic scoring. Allowed tasks may include structured extraction or a secondary relevance explanation. It must never be required for collection, identity, deduplication, quota control, or basic alert delivery.
 
 AI execution requires all of the following:
 
@@ -226,6 +228,7 @@ The conceptual durable records are:
 - `vacancy`: stable deduplicated domain identity;
 - `vacancy_link`: evidence connecting observations to a vacancy;
 - `decision`: versioned deterministic rules, Early Signal, eligibility outcome, reasons;
+- `scoring`: heuristic score, feature evidence, rule version, and score outcome;
 - `enrichment`: optional AI output with provenance and validation state;
 - `notification_outbox`: channel payload reference, idempotency key, delivery state;
 - `operational_event`: bounded structured diagnostics;
@@ -271,12 +274,15 @@ An operational health summary must be derivable without a frontend: latest succe
 
 - New eligible vacancies discovered per day.
 - Alerted vacancies per day and per query.
+- Applications attributed to an alerted vacancy, when recorded by the external workflow.
+- Funnel conversion by query: `jobs_found -> unique_jobs -> relevant_jobs -> alerts -> applications`.
 - Time from trustworthy source publication to `first_seen_at`, reported only where publication time is reliable.
 - Time from `first_seen_at` to alert delivery.
 - Duplicate suppression rate.
 - Query yield and eligible yield.
 - Source contribution and source freshness confidence.
 - Manual relevance precision from reviewed alert samples until an explicit feedback mechanism exists.
+- Comparison against the Job Finder baseline for coverage, consistency, and discovery latency once equivalent observations exist.
 
 ### 7.2 Reliability metrics
 
@@ -365,6 +371,7 @@ The first executable milestone may still prove only that Cron starts a round; it
 - Queue-based distribution introduces eventual completion and duplicate delivery but isolates failures and allows bounded retries.
 - D1 centralizes relational truth but requires disciplined indexes, batched access, and retention to remain within row and storage quotas.
 - No frontend makes analysis less convenient but keeps the MVP focused on discovery quality and reliability.
+- The Cloudflare Prospector pattern is an architectural reference for distributed monitoring, persistence, and notifications; it is contextual evidence, not a Haadar dependency or a template to copy uncritically.
 
 ## 10. Security, privacy, and source policy
 
@@ -402,13 +409,14 @@ The eventual MVP must demonstrate, through tests and controlled deployment evide
 3. at least one real adapter persists normalized evidence before classification;
 4. queue redelivery and repeated adapter results do not create duplicate observations, vacancies, or alerts;
 5. adapter failure produces a bounded retry or explicit terminal outcome without blocking the entire round;
-6. Early Signal never presents an inferred publication time as a known fact;
-7. the Budget Guard suppresses optional work and then new work before configured ceilings;
-8. the complete path works with Workers AI unavailable;
-9. every alert can be traced to source evidence, rule version, decision reasons, and delivery state;
-10. current usage remains within revalidated Workers Free allowances during a representative observation period;
-11. operational health can be determined without a frontend;
-12. no excluded component is required for normal MVP operation.
+6. an Early Signal can be emitted after the deterministic gate without waiting for the complete round, and final processing does not duplicate its alert;
+7. Early Signal never presents an inferred publication time as a known fact;
+8. heuristic scoring and Final Decision remain available when Workers AI is unavailable;
+9. the Budget Guard suppresses optional work and then new work before configured ceilings;
+10. every alert can be traced to source evidence, rule version, decision reasons, and delivery state;
+11. current usage remains within revalidated Workers Free allowances during a representative observation period;
+12. operational health can be determined without a frontend;
+13. no excluded component is required for normal MVP operation.
 
 ## 12. Planned Git narrative
 
