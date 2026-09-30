@@ -89,4 +89,42 @@ async function reconcileRoundForTask(db: D1Database, taskId: string, now: string
      updated_at = ?
      WHERE id = (SELECT round_id FROM discovery_tasks WHERE id = ?)`,
   ).bind(now, taskId).run();
+  const reservation = await db.prepare(
+    `SELECT br.* FROM budget_reservations br
+     WHERE br.round_id = (SELECT round_id FROM discovery_tasks WHERE id = ?)
+       AND br.status = 'reserved'
+       AND NOT EXISTS (
+         SELECT 1 FROM discovery_tasks
+         WHERE round_id = br.round_id AND status IN ('pending', 'running', 'retryable')
+       )`,
+  ).bind(taskId).first<{
+    round_id: string;
+    usage_day: string;
+    workers_requests: number;
+    queue_operations: number;
+    d1_rows_read: number;
+    d1_rows_written: number;
+    workflow_steps: number;
+    ai_neurons: number;
+  }>();
+  if (!reservation) return;
+  const estimates = [
+    ["workers_requests", reservation.workers_requests],
+    ["queue_operations", reservation.queue_operations],
+    ["d1_rows_read", reservation.d1_rows_read],
+    ["d1_rows_written", reservation.d1_rows_written],
+    ["workflow_steps", reservation.workflow_steps],
+    ["ai_neurons", reservation.ai_neurons],
+  ] as const;
+  await db.batch([
+    ...estimates.map(([service, amount]) => db.prepare(
+      `INSERT INTO usage_ledger
+        (event_key, usage_day, service, amount, created_at, measurement_kind)
+       VALUES (?, ?, ?, ?, ?, 'estimated')
+       ON CONFLICT(event_key) DO NOTHING`,
+    ).bind(`reservation:${reservation.round_id}:${service}`, reservation.usage_day, service, amount, now)),
+    db.prepare(
+      "UPDATE budget_reservations SET status = 'consumed', updated_at = ? WHERE round_id = ? AND status = 'reserved'",
+    ).bind(now, reservation.round_id),
+  ]);
 }

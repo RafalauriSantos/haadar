@@ -42,6 +42,12 @@ The operational summary must answer: latest successful round, last 24-hour cover
 - `ESSENTIAL`: stop AI and optional Workflows; keep only essential discovery and retries.
 - `EMERGENCY`: defer nonessential work and wait for the provider reset boundary.
 
+Reservations are conservative estimates and are recorded as `estimated` when a
+round terminates; provider-derived counters, when available, are recorded as
+`measured`. The ledger only sees Haadar activity. Other projects sharing the
+same Cloudflare account remain outside its direct view, so the configured
+reserve and the pre-deploy account check are mandatory operating margin.
+
 ## Incident rules
 
 - Never enable paid billing to bypass a quota incident without a new architecture decision.

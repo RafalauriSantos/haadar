@@ -5,6 +5,8 @@ import { parseMessage } from "./queue/messages";
 import { admitRound } from "./discovery/round-coordinator";
 import { markTaskPublished } from "./storage/d1";
 import { reconcileExpiredTaskLeases } from "./storage/tasks";
+import { recordUsage } from "./observability/usage-ledger";
+import { utcDay } from "./budget/reservations";
 
 export interface Env {
   DB?: D1Database;
@@ -38,7 +40,6 @@ const worker = {
           active: true
         }]
       },
-      usage: { workersRequests: 0, queueOperations: 0, d1RowsRead: 0, d1RowsWritten: 0, workflowSteps: 0, aiNeurons: 0 },
       adapterIds: ["fixture"]
     });
     if (admission.tasks.length > 0) {
@@ -47,6 +48,13 @@ const worker = {
         if (!task.publicationLeaseToken) throw new Error("publication lease token is required");
         const marked = await markTaskPublished(env.DB!, task.id, task.publicationLeaseToken);
         if (!marked) throw new Error(`publication lease lost for task ${task.id}`);
+        await recordUsage(
+          env.DB!,
+          `task:${task.id}:queue-publish`,
+          utcDay(new Date(controller.scheduledTime)),
+          "queue_operations",
+          1,
+        );
       }));
     }
   },

@@ -2,6 +2,8 @@ import { persistCanonicalObservation, recordOperationalEvent } from "../storage/
 import { claimTaskForExecution, finishTask } from "../storage/tasks";
 import type { SourceAdapter } from "../adapters/adapter";
 import type { DiscoveryTask } from "../domain/types";
+import { recordUsage } from "../observability/usage-ledger";
+import { utcDay } from "../budget/reservations";
 
 export type ConsumeAction =
   | { action: "ack"; outcome: "completed" | "terminal" | "already_terminal"; reason?: string }
@@ -29,6 +31,20 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
   });
   if (claim.kind === "already_terminal") return { action: "ack", outcome: "already_terminal" };
   if (claim.kind === "busy") return { action: "retry", outcome: "busy", delaySeconds: 30 };
+  await recordUsage(
+    input.db,
+    `task:${input.task.id}:queue-attempt:${input.queueAttempts}`,
+    utcDay(now),
+    "queue_operations",
+    2,
+  );
+  await recordUsage(
+    input.db,
+    `task:${input.task.id}:worker-attempt:${input.queueAttempts}`,
+    utcDay(now),
+    "workers_requests",
+    1,
+  );
 
   const adapter = input.adapters[input.task.adapterId];
   if (!adapter) {

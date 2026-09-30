@@ -101,14 +101,14 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** `src/config.ts`, `src/budget/budget-guard.ts`, `src/observability/usage-ledger.ts`, `src/discovery/round-coordinator.ts`, nova migration de reservas, testes de orçamento.
 
-- [ ] Ler consumo e reservas do dia UTC antes da admissão; eliminar usage fixo em zero no scheduler.
-- [ ] Reservar custo estimado de forma atômica antes de enviar tarefas; ajustar após execução sem contar duas vezes o mesmo evento.
-- [ ] Contar Queue write/read/delete/retries, D1 rows e custos do próprio controle; distinguir estimativa de medição disponível.
-- [ ] Fazer orçamento por custo marginal e capacidade restante, não apenas por estado no início do round.
-- [ ] Configurar thresholds sem sobreposição, reserva de emergência e teto por round/source; uso inválido ou desconhecido degrada conservadoramente.
-- [ ] Reduzir EXPERIMENTAL já em CONSERVATIVE, parar enrichment em ESSENTIAL e impedir nova admissão em EMERGENCY.
-- [ ] Desacoplar cota esgotada de IA da coleta essencial quando os recursos essenciais têm capacidade.
-- [ ] Documentar consumo de outros projetos da conta e margem operacional para analytics atrasados.
+- [x] Ler consumo e reservas do dia UTC antes da admissão; eliminar usage fixo em zero no scheduler.
+- [x] Reservar custo estimado de forma atômica antes de enviar tarefas; ajustar após execução sem contar duas vezes o mesmo evento.
+- [x] Contar Queue write/read/delete/retries, D1 rows e custos do próprio controle; distinguir estimativa de medição disponível.
+- [x] Fazer orçamento por custo marginal e capacidade restante, não apenas por estado no início do round.
+- [x] Configurar thresholds sem sobreposição, reserva de emergência e teto por round/source; uso inválido ou desconhecido degrada conservadoramente.
+- [x] Reduzir EXPERIMENTAL já em CONSERVATIVE, parar enrichment em ESSENTIAL e impedir nova admissão em EMERGENCY.
+- [x] Desacoplar cota esgotada de IA da coleta essencial quando os recursos essenciais têm capacidade.
+- [x] Documentar consumo de outros projetos da conta e margem operacional para analytics atrasados.
 
 **Testes:** concorrência disputando última reserva, repetição de evento, reset UTC, números inválidos, aumento de batch e esgotamento isolado de IA.
 **Aceite:** tarefa não cabe no orçamento não é publicada; estado e motivo são persistidos.

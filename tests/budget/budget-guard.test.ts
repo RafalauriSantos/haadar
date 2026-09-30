@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { decideBudget, type UsageSnapshot } from "../../src/budget/budget-guard";
+import { freeFirstConfig, validateFreeFirstConfig } from "../../src/config";
 
 const emptyUsage: UsageSnapshot = {
   workersRequests: 0,
@@ -22,5 +23,26 @@ describe("Budget Guard", () => {
     const decision = decideBudget({ ...emptyUsage, queueOperations: 6_800 });
     expect(decision.admitEssential).toBe(true);
     expect(decision.admitOptional).toBe(false);
+  });
+
+  it("reduces experimental work in conservative mode", () => {
+    expect(decideBudget({ ...emptyUsage, queueOperations: 5_600 }).admitOptional).toBe(false);
+  });
+
+  it("does not stop essential discovery when only AI is exhausted", () => {
+    const decision = decideBudget({ ...emptyUsage, aiNeurons: 8_000 });
+    expect(decision.state).toBe("NORMAL");
+    expect(decision.admitEssential).toBe(true);
+    expect(decision.admitEnrichment).toBe(false);
+  });
+
+  it("degrades invalid usage conservatively", () => {
+    const decision = decideBudget({ ...emptyUsage, queueOperations: Number.NaN });
+    expect(decision.state).toBe("CONSERVATIVE");
+    expect(decision.admitOptional).toBe(false);
+  });
+
+  it("rejects overlapping thresholds", () => {
+    expect(() => validateFreeFirstConfig({ ...freeFirstConfig, essentialRatio: 0.6 })).toThrow(/ordered/);
   });
 });
