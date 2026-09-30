@@ -117,9 +117,9 @@ git commit -m "chore: bootstrap Cloudflare Workers project"
 **Interfaces:**
 - `RoundSlot`, `DiscoveryRound`, `DiscoveryTask`, `QueryDefinition`, `NormalizedObservation`, and `BudgetState` are exported domain types.
 - `roundSlotFor(scheduledAt: Date): string` returns a UTC slot key.
-- `idempotencyKey(parts: string[]): string` returns a stable SHA-256 hex key.
+- `idempotencyKey(parts: string[]): Promise<string>` returns a stable SHA-256 hex key using the Workers Web Crypto API.
 
-- [ ] **Step 1: Write tests for slot and idempotency determinism**
+- [x] **Step 1: Write tests for slot and idempotency determinism**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -137,15 +137,15 @@ describe("domain identifiers", () => {
 });
 ```
 
-- [ ] **Step 2: Implement the identifiers using Web Crypto SHA-256**
+- [x] **Step 2: Implement the identifiers using Web Crypto SHA-256**
 
 The implementation must join parts with `\u001f`, encode UTF-8 with `TextEncoder`, digest with `crypto.subtle.digest("SHA-256", bytes)`, and return lowercase hexadecimal.
 
-- [ ] **Step 3: Add explicit Free-First configuration**
+- [x] **Step 3: Add explicit Free-First configuration**
 
 Define internal daily ceilings for Workers requests, Queue operations, D1 rows read/written, Workflow steps, and Workers AI neurons. Keep the values in one typed object and reserve 20% for retries/control-plane work.
 
-- [ ] **Step 4: Run verification and commit**
+- [x] **Step 4: Run verification and commit**
 
 Run: `npm run typecheck; npm test`
 
