@@ -34,3 +34,5 @@ The repository intentionally evolves in small, reviewable steps:
 
 The architecture is approved and the implementation is progressing through the tracked checklist in [`docs/superpowers/plans/2026-09-30-haadar-mvp-implementation.md`](docs/superpowers/plans/2026-09-30-haadar-mvp-implementation.md). Operational guidance is in [`docs/runbooks/free-tier-operations.md`](docs/runbooks/free-tier-operations.md).
 
+The next phase is tracked in [Checklist 2 — First Real Source & Alert Delivery](docs/superpowers/plans/2026-09-30-haadar-real-source-alert-delivery.md). A code review found integration and verification gaps in the initial checklist: budget usage is currently hardcoded, queue retry outcomes are not applied by the handler, and decision/notification/health components are not yet connected end to end. Checklist 2 includes these prerequisites before real-source delivery and production acceptance. Earlier fixture-based checks do not establish production readiness.
+
