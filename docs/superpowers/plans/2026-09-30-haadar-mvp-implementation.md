@@ -358,19 +358,19 @@ git commit -m "feat: add deterministic decisions and early signals"
 - `enrichWithAi(input, aiBinding)` returns a validated result or a deterministic fallback.
 - `enqueueNotification(input)` uses an outbox idempotency key and returns the existing record on repeat.
 
-- [ ] **Step 1: Test operation with AI unavailable**
+- [x] **Step 1: Test operation with AI unavailable**
 
 The complete candidate path must produce a valid heuristic Final Decision and notification outbox record when the AI binding is absent, throttled, or returns invalid schema.
 
-- [ ] **Step 2: Test Workflow admission**
+- [x] **Step 2: Test Workflow admission**
 
 Budget states `ESSENTIAL` and `EMERGENCY` must not start optional enrichment; `NORMAL` may start it only after the deterministic gate.
 
-- [ ] **Step 3: Implement schema validation, model allowlist, and provenance**
+- [x] **Step 3: Implement schema validation, model allowlist, and provenance**
 
 Store model, prompt version, validation result, and fallback reason. Reject unbounded output and never send secrets or full raw source payloads to the model.
 
-- [ ] **Step 4: Test and commit**
+- [x] **Step 4: Test and commit**
 
 ```bash
 npm run typecheck

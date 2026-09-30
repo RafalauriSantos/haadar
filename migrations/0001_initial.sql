@@ -62,6 +62,16 @@ CREATE TABLE IF NOT EXISTS operational_events (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS notification_outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  channel TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed')),
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_round_status ON discovery_tasks(round_id, status);
 CREATE INDEX IF NOT EXISTS idx_observations_source_observed ON observations(source_id, observed_at);
 CREATE INDEX IF NOT EXISTS idx_events_created ON operational_events(created_at);
