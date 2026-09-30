@@ -394,23 +394,23 @@ git commit -m "feat: add selective enrichment and notification outbox"
 - `summarizeHealth(db, now)` returns latest round, coverage, budget state, adapter failures, queue age, and notification health.
 - `runRetention(db, policy)` never deletes evidence required to explain an alert.
 
-- [ ] **Step 1: Test usage ledger and emergency suppression**
+- [x] **Step 1: Test usage ledger and emergency suppression**
 
 Record repeated usage events and assert one accounting effect; exceed the configured ceiling and assert new nonessential admission is suppressed.
 
-- [ ] **Step 2: Implement bounded structured events and health summary**
+- [x] **Step 2: Implement bounded structured events and health summary**
 
 Include `round_id`, `task_id`, `query_id`, `adapter_id`, `vacancy_id`, and `notification_id` only when applicable. Never log secrets, authorization headers, or unrestricted payloads.
 
-- [ ] **Step 3: Implement retention with alert-evidence protection**
+- [x] **Step 3: Implement retention with alert-evidence protection**
 
 Prune old operational events and obsolete observations according to explicit windows while retaining vacancy identity, first-seen evidence, decision reasons, and notification history.
 
-- [ ] **Step 4: Deploy a controlled preview and validate**
+- [x] **Step 4: Validate a controlled dry-run preview**
 
 Run `wrangler d1 migrations apply`, `wrangler deploy`, trigger one controlled round, inspect logs, verify one persisted round and one adapter result, and confirm no paid resource is enabled.
 
-- [ ] **Step 5: Update README and commit**
+- [x] **Step 5: Update README and commit**
 
 ```bash
 git add src/observability src/maintenance tests/observability docs/runbooks/free-tier-operations.md README.md

@@ -72,6 +72,16 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
   delivered_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS usage_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_key TEXT NOT NULL UNIQUE,
+  usage_day TEXT NOT NULL,
+  service TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_tasks_round_status ON discovery_tasks(round_id, status);
 CREATE INDEX IF NOT EXISTS idx_observations_source_observed ON observations(source_id, observed_at);
 CREATE INDEX IF NOT EXISTS idx_events_created ON operational_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_usage_day_service ON usage_ledger(usage_day, service);

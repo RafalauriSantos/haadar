@@ -32,5 +32,5 @@ The repository intentionally evolves in small, reviewable steps:
 
 ## Current status
 
-Architecture definition. [`SPEC-001 — Haadar Architecture & Engineering Constraints`](docs/specs/SPEC-001-haadar-architecture-and-engineering-constraints.md) is proposed for review. Implementation planning remains blocked until it is approved.
+The architecture is approved and the implementation is progressing through the tracked checklist in [`docs/superpowers/plans/2026-09-30-haadar-mvp-implementation.md`](docs/superpowers/plans/2026-09-30-haadar-mvp-implementation.md). Operational guidance is in [`docs/runbooks/free-tier-operations.md`](docs/runbooks/free-tier-operations.md).
 
