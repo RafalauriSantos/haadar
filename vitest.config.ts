@@ -11,6 +11,9 @@ export default defineConfig(async () => {
         miniflare: {
           compatibilityDate: "2026-09-30",
           d1Databases: ["DB"],
+          workflows: {
+            ENRICHMENT_WORKFLOW: { name: "haadar-enrichment", className: "EnrichmentWorkflow" },
+          },
           bindings: { TEST_MIGRATIONS: migrations },
         },
       }),

@@ -28,6 +28,12 @@ dead_letter_queue = "haadar-discovery-dlq"
 max_concurrency = 2
 retry_delay = 30
 
+[[workflows]]
+name = "haadar-enrichment"
+binding = "ENRICHMENT_WORKFLOW"
+class_name = "EnrichmentWorkflow"
+default_retention = { success_retention = "1 day", error_retention = "2 days" }
+
 # Remote resources are opt-in. Plain `wrangler dev` always uses local emulation.
 [env.staging]
 name = "haadar-staging"
@@ -62,3 +68,9 @@ max_retries = 3
 dead_letter_queue = "haadar-discovery-dlq"
 max_concurrency = 2
 retry_delay = 30
+
+[[env.production.workflows]]
+name = "haadar-enrichment"
+binding = "ENRICHMENT_WORKFLOW"
+class_name = "EnrichmentWorkflow"
+default_retention = { success_retention = "1 day", error_retention = "2 days" }

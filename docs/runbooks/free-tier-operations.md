@@ -48,6 +48,21 @@ round terminates; provider-derived counters, when available, are recorded as
 same Cloudflare account remain outside its direct view, so the configured
 reserve and the pre-deploy account check are mandatory operating margin.
 
+## Optional Workflow and AI
+
+Revalidated on 30/09/2026: the [Cloudflare Workflows pricing reference](https://developers.cloudflare.com/workflows/reference/pricing/)
+lists a Free allowance of 3,000 workflow steps per day. Haadar reserves only
+2,400 daily workflow steps, leaving room for control-plane work and retries.
+The enrichment workflow retains successful instances for one day and errored
+instances for two days, below the documented free default retention boundary.
+
+Workers AI is intentionally disabled in this pilot: no model is allowlisted and
+no AI binding is configured. A model can be enabled only after its Free
+eligibility is rechecked in current official documentation and the Budget Guard
+has capacity. A failed, unavailable, throttled, timed-out, or malformed AI
+response always records a fallback and never blocks the deterministic decision
+or Early Signal path.
+
 ## Incident rules
 
 - Never enable paid billing to bypass a quota incident without a new architecture decision.

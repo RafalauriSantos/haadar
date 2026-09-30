@@ -7,6 +7,7 @@ import { utcDay } from "../budget/reservations";
 import { evaluateAndPersist } from "../decision/pipeline";
 import { initialQueries } from "../portfolio/query-portfolio";
 import { defaultRelevanceProfile } from "../portfolio/sources";
+import type { EnrichmentWorkflowParams } from "../workflows/enrichment";
 
 export type ConsumeAction =
   | { action: "ack"; outcome: "completed" | "terminal" | "already_terminal"; reason?: string }
@@ -21,6 +22,7 @@ export interface ConsumerInput {
   maxAttempts: number;
   now?: Date;
   random?: () => number;
+  enrichmentWorkflow?: Workflow<EnrichmentWorkflowParams>;
 }
 
 export async function consumeMessage(input: ConsumerInput): Promise<ConsumeAction> {
@@ -68,13 +70,38 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       if (persistedObservation.originKind === "real") {
         const discoveryQuery = initialQueries.find((query) => query.id === observation.queryId);
         if (discoveryQuery) {
-          await evaluateAndPersist(input.db, {
+          const evaluation = await evaluateAndPersist(input.db, {
             vacancyId,
             observation: persistedObservation,
             discoveryQuery,
             profile: defaultRelevanceProfile,
             now,
           });
+          if (evaluation.outcome === "alert" && input.enrichmentWorkflow) {
+            const round = await input.db.prepare("SELECT budget_state FROM discovery_rounds WHERE id = ?")
+              .bind(input.task.roundId).first<{ budget_state: "NORMAL" | "CONSERVATIVE" | "ESSENTIAL" | "EMERGENCY" }>();
+            const instanceId = `enrichment-${vacancyId}`;
+            try {
+              await input.enrichmentWorkflow.create({
+                id: instanceId,
+                params: {
+                  instanceId,
+                  vacancyId,
+                  decisionId: evaluation.decisionId,
+                  candidate: {
+                    title: observation.title,
+                    organization: observation.organization,
+                    descriptionSummary: observation.descriptionSummary,
+                  },
+                  budgetAllowed: round?.budget_state === "NORMAL" || round?.budget_state === "CONSERVATIVE",
+                  aiEnabled: false,
+                },
+                retention: { successRetention: "1 day", errorRetention: "2 days" },
+              });
+            } catch {
+              await input.enrichmentWorkflow.get(instanceId);
+            }
+          }
         }
       }
     }

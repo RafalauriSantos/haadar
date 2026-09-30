@@ -9,10 +9,14 @@ import { recordUsage } from "./observability/usage-ledger";
 import { utcDay } from "./budget/reservations";
 import { initialQueries } from "./portfolio/query-portfolio";
 import { pilotSources } from "./portfolio/sources";
+import type { EnrichmentWorkflowParams } from "./workflows/enrichment";
+
+export { EnrichmentWorkflow } from "./workflows/enrichment";
 
 export interface Env {
   DB?: D1Database;
   HAADAR_DISCOVERY?: Queue<DiscoveryTaskMessage>;
+  ENRICHMENT_WORKFLOW?: Workflow<EnrichmentWorkflowParams>;
 }
 
 const worker = {
@@ -81,6 +85,7 @@ const worker = {
           queueAttempts: message.attempts,
           adapters,
           maxAttempts: 4,
+          enrichmentWorkflow: env.ENRICHMENT_WORKFLOW,
         });
         if (outcome.action === "ack") message.ack();
         else message.retry({ delaySeconds: outcome.delaySeconds });

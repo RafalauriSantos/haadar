@@ -1,6 +1,6 @@
 # Checklist 2 — First Real Source & Alert Delivery
 
-**Status:** em execução; Marcos 1 e 2 concluídos e verificados.
+**Status:** em execução; Marcos 1 a 8 concluídos e verificados localmente.
 **Data:** 30/09/2026.
 **Base inspecionada:** commit `6849bc1` e SPEC-001 aprovada.
 **Objetivo:** descobrir uma vaga de uma fonte pública real, persistir sua evidência, avaliá-la, entregar um alerta no destino escolhido e demonstrar recuperação de falhas com consumo controlado.
@@ -166,13 +166,13 @@ Nunca encadear deploy após verificações que falharam. Contagem de testes não
 
 **Arquivos:** `src/workflows/enrichment.ts`, `src/ai/enrichment.ts`, `wrangler.toml`, testes Workers/Workflow e migrations de provenance.
 
-- [ ] Implementar Workflow Cloudflare real, com binding, entrypoint e etapas persistidas; nome de arquivo não comprova durabilidade.
-- [ ] Iniciar somente candidatas aprovadas pelo gate e budget, com identidade determinística da instância.
-- [ ] Reservar steps/estado e limitar retries/retention; retomada não repete efeitos de notificação.
-- [ ] Limitar input/output e validar campos/tipos/faixas de uma resposta estruturada; qualquer objeto não é schema válido.
-- [ ] Selecionar modelo apenas após comprovar elegibilidade Free na documentação vigente; manter desligado por configuração no piloto inicial.
-- [ ] Persistir modelo, versão de prompt, validação e fallback sem conteúdo sensível.
-- [ ] Simular ausência, 429, timeout e resposta malformada; Final Decision determinística continua disponível.
+- [x] Implementar Workflow Cloudflare real, com binding, entrypoint e etapas persistidas; nome de arquivo não comprova durabilidade.
+- [x] Iniciar somente candidatas aprovadas pelo gate e budget, com identidade determinística da instância.
+- [x] Reservar steps/estado e limitar retries/retention; retomada não repete efeitos de notificação.
+- [x] Limitar input/output e validar campos/tipos/faixas de uma resposta estruturada; qualquer objeto não é schema válido.
+- [x] Selecionar modelo apenas após comprovar elegibilidade Free na documentação vigente; manter desligado por configuração no piloto inicial.
+- [x] Persistir modelo, versão de prompt, validação e fallback sem conteúdo sensível.
+- [x] Simular ausência, 429, timeout e resposta malformada; Final Decision determinística continua disponível.
 
 **Aceite:** teste de retomada demonstra estado durável; todas as falhas opcionais preservam o caminho determinístico.
 **Commit:** `feat: add durable selective enrichment workflow`.

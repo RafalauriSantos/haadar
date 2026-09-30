@@ -14,6 +14,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isEnrichmentOutput(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) return false;
+  if (typeof value.summary !== "string" || value.summary.length === 0 || value.summary.length > 1_000) return false;
+  if (!Array.isArray(value.skills) || value.skills.length > 20 || value.skills.some((item) => typeof item !== "string" || item.length > 100)) return false;
+  return typeof value.confidence === "number" && Number.isFinite(value.confidence)
+    && value.confidence >= 0 && value.confidence <= 1;
+}
+
 export async function enrichWithAi(
   input: Record<string, unknown>,
   aiBinding: AiBinding | undefined,
@@ -23,7 +31,7 @@ export async function enrichWithAi(
   if (!aiBinding || !options.allowedModels.includes(options.model)) return { status: "fallback", model: options.model, promptVersion: options.promptVersion, output: null, fallbackReason: "unavailable" };
   try {
     const output = await aiBinding.run(options.model, input);
-    if (!isRecord(output)) throw new Error("invalid_schema");
+    if (!isEnrichmentOutput(output)) throw new Error("invalid_schema");
     return { status: "completed", model: options.model, promptVersion: options.promptVersion, output };
   } catch {
     return { status: "fallback", model: options.model, promptVersion: options.promptVersion, output: null, fallbackReason: "invalid_schema" };
