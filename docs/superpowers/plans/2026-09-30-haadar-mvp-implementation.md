@@ -419,19 +419,19 @@ git commit -m "feat: add Haadar observability and budget operations"
 
 ## Completion checklist
 
-- [ ] SPEC-001 approved and committed.
-- [ ] GitHub repository created and `main` pushed.
-- [ ] Worker bootstrap and local tests pass.
-- [ ] D1 migrations and unique constraints pass locally.
-- [ ] Two Cron schedules validated for the 90-minute cadence.
-- [ ] Query Portfolio revision is recorded per round.
-- [ ] Queue task admission is bounded by Budget Guard.
-- [ ] At least one adapter persists normalized evidence before decisions.
-- [ ] Duplicate delivery does not duplicate observations or alerts.
-- [ ] Early Signal is provisional, fast, explainable, and idempotent.
-- [ ] Heuristic scoring and Final Decision work without Workers AI.
-- [ ] Selective Workflows are disabled under essential/emergency budget states.
-- [ ] Usage ledger, health summary, retention, and runbook are verified.
-- [ ] Representative observation remains inside revalidated Workers Free quotas.
-- [ ] Each milestone has a focused test result and a separate Git commit.
+- [x] SPEC-001 approved and committed.
+- [x] GitHub repository created and `main` pushed.
+- [x] Worker bootstrap and local tests pass.
+- [x] D1 migrations and unique constraints pass locally and remotely.
+- [x] Two Cron schedules validated for the 90-minute cadence.
+- [x] Query Portfolio revision is recorded per round.
+- [x] Queue task admission is bounded by Budget Guard.
+- [x] At least one adapter persists normalized evidence before decisions.
+- [x] Duplicate delivery does not duplicate observations or alerts.
+- [x] Early Signal is provisional, fast, explainable, and idempotent.
+- [x] Heuristic scoring and Final Decision work without Workers AI.
+- [x] Selective Workflows are disabled under essential/emergency budget states.
+- [x] Usage ledger, health summary, retention, and runbook are verified.
+- [ ] Representative observation remains inside revalidated Workers Free quotas; requires a scheduled or manually triggered live round observation.
+- [x] Each milestone has a focused test result and a separate Git commit.
 

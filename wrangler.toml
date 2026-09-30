@@ -1,6 +1,7 @@
 name = "haadar"
 main = "src/index.ts"
 compatibility_date = "2026-09-30"
+workers_dev = true
 
 [observability]
 enabled = true
@@ -11,5 +12,12 @@ crons = ["0 */3 * * *", "30 1-23/3 * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "haadar"
-database_id = "local-placeholder"
+database_id = "6e390e86-1164-413b-aec6-f48c1dc4b290"
 migrations_dir = "migrations"
+
+[[queues.producers]]
+queue = "haadar-discovery"
+binding = "HAADAR_DISCOVERY"
+
+[[queues.consumers]]
+queue = "haadar-discovery"
