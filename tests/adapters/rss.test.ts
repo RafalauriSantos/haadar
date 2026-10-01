@@ -9,4 +9,19 @@ describe("Google News RSS adapter", () => {
     expect(result.diagnostics).toEqual([]);
     expect(result.observations[0]).toMatchObject({ sourceVacancyId: "rss-1", title: "Vaga Desenvolvedor Java Junior — Empresa", canonicalUrl: "https://news.google.com/rss/articles/abc", publishedAt: "2026-10-01T10:00:00.000Z" });
   });
+
+  it("identifies bounded public feed requests as Haadar", async () => {
+    let headers: HeadersInit | undefined;
+    const adapter = new GoogleNewsRssAdapter(
+      rssSources[0],
+      [],
+      () => new Date(),
+      async (_input, init) => {
+        headers = init?.headers;
+        return new Response("<rss><channel></channel></rss>", { headers: { "content-type": "application/rss+xml" } });
+      },
+    );
+    await adapter.discover({ id: "task", roundId: "round", queryId: "board", adapterId: rssSources[0].id, idempotencyKey: "key", attempt: 0 });
+    expect(headers).toMatchObject({ "user-agent": "Haadar vacancy discovery" });
+  });
 });
