@@ -41,6 +41,23 @@ describe("recoverable notification dispatch", () => {
     expect(await env.DB.prepare("SELECT state FROM notification_deliveries WHERE intent_key = 'delivery-unknown'").first()).toMatchObject({ state: "unknown" });
   });
 
+  it("sends an alert stored with the canonical vacancy URL", async () => {
+    await insertIntent("delivery-canonical-url");
+    await env.DB.prepare(
+      "UPDATE alert_intents SET payload_json = ? WHERE idempotency_key = 'delivery-canonical-url'",
+    ).bind(JSON.stringify({
+      title: "Backend Developer",
+      organization: "Acme",
+      location: "Remote",
+      canonicalUrl: "https://jobs.example/canonical-url",
+      stage: "final",
+    })).run();
+    const client: TelegramClient = { send: async () => ({ kind: "sent", messageId: "44" }) };
+    await expect(dispatchOne(env.DB, client, now)).resolves.toBe("sent");
+    expect(await env.DB.prepare("SELECT state FROM notification_deliveries WHERE intent_key = 'delivery-canonical-url'").first())
+      .toMatchObject({ state: "sent" });
+  });
+
   it("marks an expired sending lease as unknown before considering another intent", async () => {
     await insertIntent("delivery-expired");
     await env.DB.prepare(

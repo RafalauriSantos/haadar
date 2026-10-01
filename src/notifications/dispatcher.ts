@@ -44,8 +44,8 @@ export async function dispatchOne(
      FROM alert_intents ai WHERE ai.idempotency_key = ?`,
   ).bind(claimed.intent_key).first<DeliveryRow>();
   if (!row) return "unknown";
-  let payload: TelegramAlertCard;
-  try { payload = JSON.parse(row.payload_json) as TelegramAlertCard; } catch { return mark(db, row.intent_key, lease, "failed", now, "invalid_payload"); }
+  const payload = parseTelegramAlertCard(row.payload_json);
+  if (!payload) return mark(db, row.intent_key, lease, "failed", now, "invalid_payload");
   const response = await client.send(formatTelegramAlert({ ...payload, stage: row.stage }));
   if (response.kind === "sent") {
     await db.batch([
@@ -78,4 +78,22 @@ async function mark(db: D1Database, intentKey: string, lease: string, state: "fa
     db.prepare("UPDATE alert_intents SET status = 'failed', updated_at = ? WHERE idempotency_key = ?").bind(nowIso, intentKey),
   ]);
   return state;
+}
+
+function parseTelegramAlertCard(payloadJson: string): TelegramAlertCard | null {
+  try {
+    const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+    const url = typeof payload.url === "string" ? payload.url : payload.canonicalUrl;
+    if (typeof payload.title !== "string" || typeof url !== "string") return null;
+    return {
+      title: payload.title,
+      organization: typeof payload.organization === "string" ? payload.organization : null,
+      location: typeof payload.location === "string" ? payload.location : null,
+      source: typeof payload.source === "string" ? payload.source : null,
+      url,
+      stage: "final",
+    };
+  } catch {
+    return null;
+  }
 }
