@@ -1,16 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { defaultRelevanceProfile, pilotSources } from "../../src/portfolio/sources";
+import { defaultRelevanceProfile, githubIssuesSources, pilotSources } from "../../src/portfolio/sources";
 import { initialQueries } from "../../src/portfolio/query-portfolio";
 
-describe("first source contract", () => {
-  it("keeps the pilot bounded to one public board request", () => {
-    expect(pilotSources).toHaveLength(1);
+describe("public source contracts", () => {
+  it("keeps every source bounded to one public board request", () => {
+    expect(pilotSources).toHaveLength(3);
     expect(pilotSources[0]).toMatchObject({
       id: "greenhouse:planetscale",
       fetchStrategy: "board_once",
       allowedHosts: ["boards-api.greenhouse.io"],
       limits: { maxRequestsPerTask: 1, maxRecords: 200 },
     });
+    expect(githubIssuesSources).toHaveLength(2);
+    expect(githubIssuesSources).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        adapterId: "github-issues",
+        allowedHosts: ["api.github.com"],
+        limits: expect.objectContaining({ maxRequestsPerTask: 1, maxRecords: 50 }),
+      }),
+    ]));
   });
 
   it("represents every query family without requiring stack in the role query", () => {

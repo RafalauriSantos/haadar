@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { GreenhouseAdapter } from "../../src/adapters/greenhouse";
 import { fetchBoundedJson } from "../../src/adapters/http";
-import { pilotSources } from "../../src/portfolio/sources";
+import { greenhouseSources } from "../../src/portfolio/sources";
 import type { QueryDefinition } from "../../src/domain/types";
 
-const source = pilotSources[0];
+const source = greenhouseSources[0];
 const task = { id: "task", roundId: "round", queryId: "board", adapterId: source.id, idempotencyKey: "key", attempt: 0 };
 const queries: QueryDefinition[] = [
   { id: "role", revision: "1", family: "ROLE", terms: ["backend", "software engineer"], exclusions: [], priority: 2, estimatedCost: 1, active: true },

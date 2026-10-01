@@ -16,6 +16,7 @@ export interface BoundedFetchOptions {
   timeoutMs: number;
   maxBytes: number;
   maxRedirects?: number;
+  headers?: HeadersInit;
   fetcher?: typeof fetch;
 }
 
@@ -32,7 +33,7 @@ export async function fetchBoundedJson(url: string, options: BoundedFetchOptions
           method: "GET",
           redirect: "manual",
           signal: controller.signal,
-          headers: { accept: "application/json" },
+          headers: { accept: "application/json", ...options.headers },
         });
       } catch (error) {
         if (controller.signal.aborted) throw new AdapterHttpError("retryable", "request_timeout");

@@ -1,5 +1,5 @@
 import type { DiscoveryTask, NormalizedObservation, QueryDefinition } from "../domain/types";
-import type { SourceDefinition } from "../portfolio/sources";
+import type { GreenhouseSourceDefinition } from "../portfolio/sources";
 import type { AdapterResult, SourceAdapter } from "./adapter";
 import { AdapterHttpError, fetchBoundedJson } from "./http";
 import { explicitWorkModel, htmlToBoundedText, normalizeWhitespace, vacancyFingerprint } from "../normalization/vacancy";
@@ -18,7 +18,7 @@ export class GreenhouseAdapter implements SourceAdapter {
   readonly fetchStrategy = "board_once" as const;
 
   constructor(
-    private readonly source: SourceDefinition,
+    private readonly source: GreenhouseSourceDefinition,
     private readonly queries: QueryDefinition[],
     private readonly observedAt: () => Date = () => new Date(),
     private readonly fetcher: typeof fetch = fetch,

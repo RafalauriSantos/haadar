@@ -1,4 +1,5 @@
 import { GreenhouseAdapter } from "./adapters/greenhouse";
+import { GitHubIssuesAdapter } from "./adapters/github-issues";
 import { consumeMessage } from "./queue/consumer";
 import type { DiscoveryTaskMessage } from "./queue/messages";
 import { parseMessage } from "./queue/messages";
@@ -123,7 +124,9 @@ const worker = {
       try {
         const adapters = Object.fromEntries(pilotSources.map((source) => [
           source.id,
-          new GreenhouseAdapter(source, initialQueries),
+          source.adapterId === "greenhouse"
+            ? new GreenhouseAdapter(source, initialQueries)
+            : new GitHubIssuesAdapter(source, initialQueries),
         ]));
         const outcome = await consumeMessage({
           db: env.DB,
