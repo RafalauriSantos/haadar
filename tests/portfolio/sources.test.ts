@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { defaultRelevanceProfile, githubIssuesSources, gupySources, pilotSources, tramposSources } from "../../src/portfolio/sources";
+import { defaultRelevanceProfile, githubIssuesSources, gupySources, linkedinGuestSources, pilotSources, tramposSources } from "../../src/portfolio/sources";
 import { initialQueries } from "../../src/portfolio/query-portfolio";
 
 describe("public source contracts", () => {
   it("keeps every source bounded to one public board request", () => {
-    expect(pilotSources).toHaveLength(15);
+    expect(pilotSources).toHaveLength(18);
     expect(pilotSources[0]).toMatchObject({
       id: "greenhouse:planetscale",
       fetchStrategy: "board_once",
@@ -29,5 +29,15 @@ describe("public source contracts", () => {
     );
     expect(initialQueries.find((query) => query.family === "ROLE")?.terms).not.toContain("typescript");
     expect(defaultRelevanceProfile.roles).toContain("backend");
+  });
+
+  it("keeps LinkedIn guest discovery inactive and tightly bounded", () => {
+    expect(linkedinGuestSources.map((source) => source.keywords)).toEqual([
+      "Desenvolvedor Java Junior",
+      "Desenvolvedor Node Junior",
+      "Desenvolvedor Full Stack Junior",
+    ]);
+    expect(linkedinGuestSources.every((source) => !source.active)).toBe(true);
+    expect(linkedinGuestSources.every((source) => source.limits.maxRequestsPerTask === 1)).toBe(true);
   });
 });

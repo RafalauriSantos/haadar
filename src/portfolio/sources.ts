@@ -35,8 +35,14 @@ export interface TramposSourceDefinition extends SourceDefinitionBase {
   adapterId: "trampos";
 }
 export interface RssSourceDefinition extends SourceDefinitionBase { adapterId: "google-news-rss"; feedUrl: string; }
+export interface LinkedInGuestSourceDefinition extends SourceDefinitionBase {
+  adapterId: "linkedin-guest";
+  keywords: string;
+  geoId: "106057199";
+  timeRange: "r7200";
+}
 
-export type SourceDefinition = GreenhouseSourceDefinition | GitHubIssuesSourceDefinition | GupySourceDefinition | TramposSourceDefinition | RssSourceDefinition;
+export type SourceDefinition = GreenhouseSourceDefinition | GitHubIssuesSourceDefinition | GupySourceDefinition | TramposSourceDefinition | RssSourceDefinition | LinkedInGuestSourceDefinition;
 
 export const greenhouseSources: GreenhouseSourceDefinition[] = [{
   id: "greenhouse:planetscale",
@@ -145,7 +151,25 @@ export const rssSources: RssSourceDefinition[] = [
   { id: "rss:indeed-junior", adapterId: "google-news-rss", feedUrl: "https://news.google.com/rss/search?q=site:br.indeed.com+(desenvolvedor+OR+developer+OR+programador+OR+software)+(junior+OR+jr+OR+estagio)+remoto&hl=pt-BR&gl=BR&ceid=BR:pt-419", organization: "Google News: Indeed", allowedHosts: ["news.google.com"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 256 * 1024, maxRequestsPerTask: 1, maxRecords: 30 }, active: true },
 ];
 
-export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources, ...rssSources];
+export const linkedinGuestSources: LinkedInGuestSourceDefinition[] = [
+  "Desenvolvedor Java Junior",
+  "Desenvolvedor Node Junior",
+  "Desenvolvedor Full Stack Junior",
+].map((keywords) => ({
+  id: `linkedin-guest:${keywords.toLowerCase().replaceAll(" ", "-")}`,
+  adapterId: "linkedin-guest",
+  keywords,
+  geoId: "106057199",
+  timeRange: "r7200",
+  organization: "LinkedIn guest search",
+  allowedHosts: ["www.linkedin.com"],
+  fetchStrategy: "board_once",
+  applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"],
+  limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 25 },
+  active: false,
+}));
+
+export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources, ...rssSources, ...linkedinGuestSources];
 
 export interface RelevanceProfile {
   roles: string[];
