@@ -70,15 +70,15 @@ export async function reserveRoundBudget(
      SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', ?, ?, ?
      WHERE
        (SELECT coalesce(SUM(amount), 0) FROM usage_ledger WHERE usage_day = ? AND service = 'workers_requests')
-       + (SELECT coalesce(SUM(workers_requests), 0) FROM budget_reservations WHERE usage_day = ? AND status IN ('reserved', 'consumed')) + ? <= ?
+       + (SELECT coalesce(SUM(workers_requests), 0) FROM budget_reservations WHERE usage_day = ? AND status = 'reserved') + ? <= ?
        AND (SELECT coalesce(SUM(amount), 0) FROM usage_ledger WHERE usage_day = ? AND service = 'queue_operations')
-       + (SELECT coalesce(SUM(queue_operations), 0) FROM budget_reservations WHERE usage_day = ? AND status IN ('reserved', 'consumed')) + ? <= ?
+       + (SELECT coalesce(SUM(queue_operations), 0) FROM budget_reservations WHERE usage_day = ? AND status = 'reserved') + ? <= ?
        AND (SELECT coalesce(SUM(amount), 0) FROM usage_ledger WHERE usage_day = ? AND service = 'd1_rows_read')
-       + (SELECT coalesce(SUM(d1_rows_read), 0) FROM budget_reservations WHERE usage_day = ? AND status IN ('reserved', 'consumed')) + ? <= ?
+       + (SELECT coalesce(SUM(d1_rows_read), 0) FROM budget_reservations WHERE usage_day = ? AND status = 'reserved') + ? <= ?
        AND (SELECT coalesce(SUM(amount), 0) FROM usage_ledger WHERE usage_day = ? AND service = 'd1_rows_written')
-       + (SELECT coalesce(SUM(d1_rows_written), 0) FROM budget_reservations WHERE usage_day = ? AND status IN ('reserved', 'consumed')) + ? <= ?
+       + (SELECT coalesce(SUM(d1_rows_written), 0) FROM budget_reservations WHERE usage_day = ? AND status = 'reserved') + ? <= ?
        AND (SELECT coalesce(SUM(amount), 0) FROM usage_ledger WHERE usage_day = ? AND service = 'workflow_steps')
-       + (SELECT coalesce(SUM(workflow_steps), 0) FROM budget_reservations WHERE usage_day = ? AND status IN ('reserved', 'consumed')) + ? <= ?
+       + (SELECT coalesce(SUM(workflow_steps), 0) FROM budget_reservations WHERE usage_day = ? AND status = 'reserved') + ? <= ?
      ON CONFLICT(round_id) DO NOTHING`,
   ).bind(
     input.roundId,

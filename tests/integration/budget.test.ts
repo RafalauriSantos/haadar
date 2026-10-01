@@ -34,6 +34,26 @@ describe("persisted budget reservations", () => {
     expect(utcDay(new Date("2026-10-05T23:59:59.999-03:00"))).toBe("2026-10-06");
   });
 
+  it("does not count a consumed reservation twice after its estimate reaches the ledger", async () => {
+    const day = "2026-10-07";
+    const now = "2026-10-07T00:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT INTO budget_reservations
+        (round_id, usage_day, workers_requests, queue_operations, d1_rows_read, d1_rows_written, workflow_steps, ai_neurons, status, reason, created_at, updated_at)
+       VALUES ('budget-consumed', ?, 1, 6, 1, 1, 0, 0, 'consumed', 'test', ?, ?)`,
+    ).bind(day, now, now).run();
+    await env.DB.prepare(
+      `INSERT INTO usage_ledger (event_key, usage_day, service, amount, created_at, measurement_kind)
+       VALUES ('reservation:budget-consumed:queue_operations', ?, 'queue_operations', 6, ?, 'estimated')`,
+    ).bind(day, now).run();
+
+    await expect(reserveRoundBudget(
+      env.DB,
+      { roundId: "budget-after-consumed", day, cost: { ...cost, queueOperations: 3 }, now, reason: "test" },
+      tinyConfig,
+    )).resolves.toMatchObject({ admitted: true });
+  });
+
   it("rejects invalid measurements and increases marginal cost with task count", async () => {
     await expect(recordUsage(env.DB, "usage-invalid", "2026-10-05", "queue_operations", Number.NaN)).rejects.toThrow(/finite/);
     expect(estimateRoundCost(5).queueOperations).toBeGreaterThan(estimateRoundCost(1).queueOperations);

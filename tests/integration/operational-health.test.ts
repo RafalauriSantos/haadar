@@ -1,8 +1,10 @@
 import { env } from "cloudflare:workers";
+import { createExecutionContext } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { getOperationalHealth } from "../../src/observability/health";
 import { runRetention } from "../../src/maintenance/retention";
 import { getDiscoveryMetrics } from "../../src/observability/metrics";
+import worker from "../../src/index";
 
 const now = new Date("2026-10-06T12:00:00.000Z");
 
@@ -77,5 +79,19 @@ describe("operational health and retention", () => {
     ]);
     const metrics = await getDiscoveryMetrics(env.DB, "2026-10-06T00:00:00.000Z");
     expect(metrics).toEqual([expect.objectContaining({ sourceId: "greenhouse-planetscale", queryId: "role-backend", rawOccurrences: 1, uniqueVacancies: 1, exclusiveVacancies: 1, eligible: 0 })]);
+  });
+
+  it("runs bounded retention from the daily maintenance slot", async () => {
+    await env.DB.prepare(
+      `INSERT INTO operational_events (event_key, event_type, payload_json, created_at)
+       VALUES ('scheduled-retention-event', 'diagnostic', '{}', '2026-01-01T00:00:00.000Z')`,
+    ).run();
+    const queue = { async sendBatch() {} };
+    await worker.scheduled(
+      { scheduledTime: Date.parse("2026-10-08T03:00:00.000Z"), cron: "*/5 * * * *", noRetry() {} } as ScheduledController,
+      { DB: env.DB, HAADAR_DISCOVERY: queue } as never,
+      createExecutionContext(),
+    );
+    expect(await env.DB.prepare("SELECT id FROM operational_events WHERE event_key = 'scheduled-retention-event'").first()).toBeNull();
   });
 });
