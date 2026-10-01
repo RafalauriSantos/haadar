@@ -51,7 +51,7 @@ export class LinkedInGuestAdapter implements SourceAdapter {
           location: card.location ?? "",
           description,
         }));
-        const fingerprint = await vacancyFingerprint({ organization: card.organization, title: card.title, location: card.location, description });
+        const fingerprint = await vacancyFingerprint({ organization: card.organization ?? this.source.organization, title: card.title, location: card.location, description });
         for (const query of matchingQueries) {
           observations.push({
             sourceId: this.source.id,

@@ -3,8 +3,9 @@ import { createExecutionContext, createMessageBatch, getQueueResult } from "clou
 import { describe, expect, it } from "vitest";
 import type { SourceAdapter } from "../../src/adapters/adapter";
 import { admitRound } from "../../src/discovery/round-coordinator";
-import worker from "../../src/index";
+import worker, { createAdapters } from "../../src/index";
 import { consumeMessage, retryDelay } from "../../src/queue/consumer";
+import { linkedinGuestSources } from "../../src/portfolio/sources";
 
 const usage = { workersRequests: 0, queueOperations: 0, d1RowsRead: 0, d1RowsWritten: 0, workflowSteps: 0, aiNeurons: 0 };
 
@@ -109,6 +110,19 @@ describe("persistent queue lifecycle", () => {
   it("bounds exponential retry delay with jitter", () => {
     expect(retryDelay(1, () => 0)).toBe(30);
     expect(retryDelay(50, () => 0.999)).toBeLessThanOrEqual(900);
+  });
+
+  it("routes an active LinkedIn guest task to its adapter factory entry", async () => {
+    const source = { ...linkedinGuestSources[0], active: true };
+    const task = await createTask("2026-10-03T08:30:00.000Z", source.id);
+    const result = await consumeMessage({
+      db: env.DB,
+      task,
+      queueAttempts: 1,
+      adapters: createAdapters([source], async () => new Response("<li></li>", { headers: { "content-type": "text/html" } })),
+      maxAttempts: 4,
+    });
+    expect(result).toMatchObject({ action: "ack", outcome: "terminal", reason: "schema_changed" });
   });
 
   it("aggregates mixed task outcomes into a partial terminal round", async () => {

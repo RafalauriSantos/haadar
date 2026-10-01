@@ -3,6 +3,8 @@ import { GitHubIssuesAdapter } from "./adapters/github-issues";
 import { GupyAdapter } from "./adapters/gupy";
 import { TramposAdapter } from "./adapters/trampos";
 import { GoogleNewsRssAdapter } from "./adapters/rss";
+import { LinkedInGuestAdapter } from "./adapters/linkedin-guest";
+import type { SourceAdapter } from "./adapters/adapter";
 import { consumeMessage } from "./queue/consumer";
 import type { DiscoveryTaskMessage } from "./queue/messages";
 import { parseMessage } from "./queue/messages";
@@ -16,6 +18,7 @@ import { createTelegramClient } from "./notifications/telegram";
 import { dispatchOne } from "./notifications/dispatcher";
 import { initialQueries } from "./portfolio/query-portfolio";
 import { pilotSources } from "./portfolio/sources";
+import type { SourceDefinition } from "./portfolio/sources";
 import type { EnrichmentWorkflowParams } from "./workflows/enrichment";
 
 export { EnrichmentWorkflow } from "./workflows/enrichment";
@@ -28,6 +31,23 @@ export interface Env {
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_DESTINATION?: string;
   ADMIN_TRIGGER_TOKEN?: string;
+}
+
+export function createAdapters(sources: SourceDefinition[], fetcher?: typeof fetch): Record<string, SourceAdapter> {
+  return Object.fromEntries(sources.map((source) => [
+    source.id,
+    source.adapterId === "greenhouse"
+      ? new GreenhouseAdapter(source, initialQueries, undefined, fetcher)
+      : source.adapterId === "github-issues"
+        ? new GitHubIssuesAdapter(source, initialQueries, undefined, fetcher)
+        : source.adapterId === "gupy"
+          ? new GupyAdapter(source, initialQueries, undefined, fetcher)
+          : source.adapterId === "trampos"
+            ? new TramposAdapter(source, initialQueries, undefined, fetcher)
+            : source.adapterId === "linkedin-guest"
+              ? new LinkedInGuestAdapter(source, initialQueries, undefined, fetcher)
+              : new GoogleNewsRssAdapter(source, initialQueries, undefined, fetcher),
+  ]));
 }
 
 async function runDiscoveryRound(env: Env, scheduledAt: Date): Promise<{ roundId: string; admittedTasks: number }> {
@@ -125,18 +145,7 @@ const worker = {
         continue;
       }
       try {
-        const adapters = Object.fromEntries(pilotSources.map((source) => [
-          source.id,
-          source.adapterId === "greenhouse"
-            ? new GreenhouseAdapter(source, initialQueries)
-            : source.adapterId === "github-issues"
-              ? new GitHubIssuesAdapter(source, initialQueries)
-              : source.adapterId === "gupy"
-                ? new GupyAdapter(source, initialQueries)
-                : source.adapterId === "trampos"
-                  ? new TramposAdapter(source, initialQueries)
-                  : new GoogleNewsRssAdapter(source, initialQueries),
-        ]));
+        const adapters = createAdapters(pilotSources);
         const outcome = await consumeMessage({
           db: env.DB,
           task: parsed.value,
