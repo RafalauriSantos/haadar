@@ -31,13 +31,13 @@ describe("public source contracts", () => {
     expect(defaultRelevanceProfile.roles).toContain("backend");
   });
 
-  it("keeps LinkedIn guest discovery inactive and tightly bounded", () => {
+  it("keeps LinkedIn guest discovery tightly bounded", () => {
     expect(linkedinGuestSources.map((source) => source.keywords)).toEqual([
       "Desenvolvedor Java Junior",
       "Desenvolvedor Node Junior",
       "Desenvolvedor Full Stack Junior",
     ]);
-    expect(linkedinGuestSources.every((source) => !source.active)).toBe(true);
+    expect(linkedinGuestSources.every((source) => source.active)).toBe(true);
     expect(linkedinGuestSources.every((source) => source.limits.maxRequestsPerTask === 1)).toBe(true);
   });
 });

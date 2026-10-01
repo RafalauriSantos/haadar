@@ -166,7 +166,7 @@ export const linkedinGuestSources: LinkedInGuestSourceDefinition[] = [
   fetchStrategy: "board_once",
   applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"],
   limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 25 },
-  active: false,
+  active: true,
 }));
 
 export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources, ...rssSources, ...linkedinGuestSources];
