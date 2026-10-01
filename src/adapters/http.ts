@@ -21,6 +21,20 @@ export interface BoundedFetchOptions {
 }
 
 export async function fetchBoundedJson(url: string, options: BoundedFetchOptions): Promise<unknown> {
+  const text = await fetchBoundedText(url, { ...options, accept: "application/json", expectedContentType: "application/json" });
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new AdapterHttpError("schema_changed", "invalid_json");
+  }
+}
+
+interface BoundedTextFetchOptions extends BoundedFetchOptions {
+  accept?: string;
+  expectedContentType?: string;
+}
+
+export async function fetchBoundedText(url: string, options: BoundedTextFetchOptions): Promise<string> {
   const fetcher = options.fetcher ?? fetch;
   let current = validateUrl(url, options.allowedHosts);
   const controller = new AbortController();
@@ -33,7 +47,7 @@ export async function fetchBoundedJson(url: string, options: BoundedFetchOptions
           method: "GET",
           redirect: "manual",
           signal: controller.signal,
-          headers: { accept: "application/json", ...options.headers },
+          headers: { accept: options.accept ?? "text/html", ...options.headers },
         });
       } catch (error) {
         if (controller.signal.aborted) throw new AdapterHttpError("retryable", "request_timeout");
@@ -56,13 +70,11 @@ export async function fetchBoundedJson(url: string, options: BoundedFetchOptions
       if (!response.ok) throw new AdapterHttpError("permanent", `http_${response.status}`);
 
       const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-      if (!contentType.includes("application/json")) throw new AdapterHttpError("schema_changed", "unexpected_content_type");
-      const text = await readBoundedBody(response, options.maxBytes);
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new AdapterHttpError("schema_changed", "invalid_json");
+      const expectedContentType = options.expectedContentType ?? "text/html";
+      if (!contentType.includes(expectedContentType)) {
+        throw new AdapterHttpError("schema_changed", "unexpected_content_type");
       }
+      return readBoundedBody(response, options.maxBytes);
     }
   } finally {
     clearTimeout(timeout);
