@@ -21,6 +21,8 @@ describe("public source contracts", () => {
         limits: expect.objectContaining({ maxRequestsPerTask: 1, maxRecords: 50 }),
       }),
     ]));
+    expect(githubIssuesSources.map((source) => source.dispatchDelaySeconds)).toEqual([0, 30, 60, 90, 120, 150, 180]);
+    expect(gupySources.map((source) => source.dispatchDelaySeconds)).toEqual([0, 30, 60]);
   });
 
   it("represents every query family without requiring stack in the role query", () => {
