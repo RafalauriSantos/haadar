@@ -26,7 +26,16 @@ export interface GitHubIssuesSourceDefinition extends SourceDefinitionBase {
   repository: string;
 }
 
-export type SourceDefinition = GreenhouseSourceDefinition | GitHubIssuesSourceDefinition;
+export interface GupySourceDefinition extends SourceDefinitionBase {
+  adapterId: "gupy";
+  term: string;
+}
+
+export interface TramposSourceDefinition extends SourceDefinitionBase {
+  adapterId: "trampos";
+}
+
+export type SourceDefinition = GreenhouseSourceDefinition | GitHubIssuesSourceDefinition | GupySourceDefinition | TramposSourceDefinition;
 
 export const greenhouseSources: GreenhouseSourceDefinition[] = [{
   id: "greenhouse:planetscale",
@@ -120,7 +129,17 @@ export const githubIssuesSources: GitHubIssuesSourceDefinition[] = [
   },
 ];
 
-export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources];
+export const gupySources: GupySourceDefinition[] = [
+  { id: "gupy:full-stack-junior", adapterId: "gupy", term: "Full Stack Junior", organization: "Gupy", allowedHosts: ["candidates.mcp.api.gupy.io"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 20 }, active: true },
+  { id: "gupy:java-junior", adapterId: "gupy", term: "Java Junior", organization: "Gupy", allowedHosts: ["candidates.mcp.api.gupy.io"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 20 }, active: true },
+  { id: "gupy:python-junior", adapterId: "gupy", term: "Python Junior", organization: "Gupy", allowedHosts: ["candidates.mcp.api.gupy.io"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 20 }, active: true },
+];
+
+export const tramposSources: TramposSourceDefinition[] = [
+  { id: "trampos:development", adapterId: "trampos", organization: "Trampos.co", allowedHosts: ["trampos.co"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 50 }, active: true },
+];
+
+export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources];
 
 export interface RelevanceProfile {
   roles: string[];
