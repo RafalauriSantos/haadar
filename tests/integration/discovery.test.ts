@@ -173,6 +173,19 @@ describe("reliable discovery identity", () => {
     expect(recovered[0]).toMatchObject({ id: task.id, deliveryMode: "silent" });
     expect(recovered[0].publicationLeaseToken).toBeTruthy();
     expect(await markTaskPublished(env.DB, recovered[0].id, recovered[0].publicationLeaseToken!, "2026-10-01T06:35:01.000Z")).toBe(true);
+
+    await env.DB.prepare(
+      `UPDATE discovery_tasks
+       SET status = 'retryable', lease_token = NULL, lease_expires_at = NULL,
+           last_error_kind = 'lease_expired', updated_at = '2026-10-01T06:35:02.000Z'
+       WHERE id = ?`,
+    ).bind(task.id).run();
+    const recoveredRetryable = await recoverExpiredTaskPublications(env.DB, {
+      now: new Date("2026-10-01T06:40:00.000Z"),
+      leaseMs: 60_000,
+    });
+    expect(recoveredRetryable).toHaveLength(1);
+    expect(recoveredRetryable[0]).toMatchObject({ id: task.id, deliveryMode: "silent" });
   });
 
   it("keeps one vacancy with multiple query occurrences and changing URLs", async () => {

@@ -81,17 +81,19 @@ export async function recoverExpiredTaskPublications(
   input: { now: Date; leaseMs: number; limit?: number },
 ): Promise<DiscoveryTask[]> {
   const now = input.now.toISOString();
+  const retryableBefore = new Date(input.now.getTime() - input.leaseMs).toISOString();
   const expired = await db.prepare(
     `UPDATE discovery_tasks
      SET status = 'retryable', lease_token = NULL, lease_expires_at = NULL,
          last_error_kind = 'lease_expired', updated_at = ?
      WHERE id IN (
        SELECT id FROM discovery_tasks
-       WHERE status = 'running' AND lease_expires_at <= ?
-       ORDER BY lease_expires_at LIMIT ?
+       WHERE (status = 'running' AND lease_expires_at <= ?)
+          OR (status = 'retryable' AND last_error_kind = 'lease_expired' AND updated_at <= ?)
+       ORDER BY COALESCE(lease_expires_at, updated_at) LIMIT ?
      )
      RETURNING id`,
-  ).bind(now, now, input.limit ?? 20).all<{ id: string }>();
+  ).bind(now, now, retryableBefore, input.limit ?? 20).all<{ id: string }>();
   if (expired.results.length === 0) return [];
 
   const ids = expired.results.map((row) => row.id);
