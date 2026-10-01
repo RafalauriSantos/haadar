@@ -25,6 +25,11 @@ throttled and follows the normal bounded Queue retry path.
 | --- | --- | --- |
 | `github-issues:backend-br/vagas` | `backend-br/vagas` | Public API returned HTTP 200 on 30/09/2026. |
 | `github-issues:soujava/vagas-java` | `soujava/vagas-java` | Public API returned HTTP 200 on 30/09/2026. |
+| `github-issues:frontendbr/vagas` | `frontendbr/vagas` | Public API returned HTTP 200 on 30/09/2026. |
+| `github-issues:react-brasil/vagas` | `react-brasil/vagas` | Public API returned HTTP 200 on 30/09/2026. |
+| `github-issues:nodejsdevbr/vagas` | `nodejsdevbr/vagas` | Public API returned HTTP 200 on 30/09/2026. |
+| `github-issues:frontend-pt/vagas` | `frontend-pt/vagas` | Public API returned HTTP 200 on 30/09/2026. |
+| `github-issues:backend-pt/vagas` | `backend-pt/vagas` | Public API returned HTTP 200 on 30/09/2026. |
 
 This source family is community-provided, not an employer ATS. An issue is a
 lead, not proof that an employer posting is still open, that its details are
@@ -43,9 +48,9 @@ does not infer seniority from missing data.
 | Response body | 512 KiB while streaming |
 | Requests per repository task | 1 |
 | Issues accepted per response | 50 |
-| Initial repositories | 2 |
+| Initial repositories | 7 |
 
-The hourly discovery round therefore adds at most two GitHub API requests.
+The hourly discovery round therefore adds at most seven GitHub API requests.
 The source fetches once per repository and applies the Query Portfolio locally;
 it never repeats the same listing request once per query.
 
