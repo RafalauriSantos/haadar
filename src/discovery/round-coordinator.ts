@@ -13,6 +13,7 @@ interface QueryPortfolioSnapshot {
 interface RoundCoordinatorInput {
   db: D1Database;
   scheduledAt: Date;
+  roundSlot?: string;
   portfolio: QueryPortfolioSnapshot;
   usage?: UsageSnapshot;
   adapterIds: string[];
@@ -29,7 +30,7 @@ export interface RoundAdmission {
 }
 
 export async function admitRound(input: RoundCoordinatorInput): Promise<RoundAdmission> {
-  const slot = roundSlotFor(input.scheduledAt);
+  const slot = input.roundSlot ?? roundSlotFor(input.scheduledAt);
   const now = input.now ?? new Date();
   const usage = input.usage ?? await readUsageSnapshot(input.db, utcDay(now));
   const decision = decideBudget(usage);

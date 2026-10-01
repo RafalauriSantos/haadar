@@ -55,6 +55,30 @@ describe("reliable discovery identity", () => {
     expect(JSON.parse(snapshot!.snapshot_json).queries).toHaveLength(2);
   });
 
+  it("keeps a manual run separate from the automatic hourly slot", async () => {
+    const hourly = await admitRound({
+      db: env.DB,
+      scheduledAt: new Date("2026-10-01T11:00:00.000Z"),
+      portfolio,
+      usage,
+      adapterIds: ["fixture"],
+      now: new Date("2026-10-01T10:15:00.000Z"),
+    });
+    const manual = await admitRound({
+      db: env.DB,
+      scheduledAt: new Date("2026-10-01T10:15:00.000Z"),
+      roundSlot: "manual:2026-10-01T10:15:00.000Z",
+      portfolio,
+      usage,
+      adapterIds: ["fixture"],
+      now: new Date("2026-10-01T10:15:00.000Z"),
+    });
+
+    expect(manual.round.id).not.toBe(hourly.round.id);
+    expect(manual.round.slot.key).toBe("manual:2026-10-01T10:15:00.000Z");
+    expect(manual.tasks).toHaveLength(2);
+  });
+
   it("recovers a publication after its lease expires and stops after publish", async () => {
     const time = new Date("2026-10-01T06:01:00.000Z");
     const admission = await admitRound({

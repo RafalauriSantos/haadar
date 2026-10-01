@@ -50,12 +50,13 @@ export function createAdapters(sources: SourceDefinition[], fetcher?: typeof fet
   ]));
 }
 
-async function runDiscoveryRound(env: Env, scheduledAt: Date): Promise<{ roundId: string; admittedTasks: number }> {
+async function runDiscoveryRound(env: Env, scheduledAt: Date, roundSlot?: string): Promise<{ roundId: string; admittedTasks: number }> {
   if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for scheduled discovery");
   await reconcileExpiredTaskLeases(env.DB, scheduledAt.toISOString());
   const admission = await admitRound({
     db: env.DB,
     scheduledAt,
+    roundSlot,
     portfolio: { revision: "portfolio-v2-greenhouse-pilot", queries: initialQueries },
     adapterIds: pilotSources.filter((source) => source.active).map((source) => source.id),
     boardOnceAdapters: true,
@@ -91,7 +92,7 @@ const worker = {
       const requestedAt = new URL(request.url).searchParams.get("scheduledAt");
       const scheduledAt = requestedAt ? new Date(requestedAt) : new Date();
       if (Number.isNaN(scheduledAt.getTime())) return Response.json({ error: "invalid_scheduled_at" }, { status: 400 });
-      return Response.json(await runDiscoveryRound(env, scheduledAt), { status: 202 });
+      return Response.json(await runDiscoveryRound(env, scheduledAt, `manual:${scheduledAt.toISOString()}`), { status: 202 });
     }
     if (pathname === "/admin/dispatch" && request.method === "POST") {
       if (!env.ADMIN_TRIGGER_TOKEN || request.headers.get("authorization") !== `Bearer ${env.ADMIN_TRIGGER_TOKEN}`) {
