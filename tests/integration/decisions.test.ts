@@ -140,4 +140,50 @@ describe("persisted decisions and early intents", () => {
     ).first<{ count: number }>();
     expect(intents?.count).toBe(5);
   });
+
+  it("does not consume another round alert place when the same vacancy is evaluated again", async () => {
+    const roundId = "round-alert-idempotency";
+    await env.DB.prepare(
+      `INSERT INTO discovery_rounds
+       (id, round_slot, scheduled_at, portfolio_revision, budget_state, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'test', 'NORMAL', 'running', ?, ?)`,
+    ).bind(roundId, roundId, now.toISOString(), now.toISOString(), now.toISOString()).run();
+    const { observation, vacancyId } = await persist({ id: "same-alert", title: "Junior Backend Software Developer" });
+    for (const queryId of ["role-backend", "broad-software"]) {
+      await evaluateAndPersist(env.DB, {
+        vacancyId,
+        observation: { ...observation, queryId, roundId },
+        discoveryQuery: initialQueries.find((query) => query.id === queryId)!,
+        profile: defaultRelevanceProfile,
+        now,
+        channel: "telegram",
+        destinationKey: "round-test-destination",
+      });
+    }
+    expect(await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM alert_round_admissions WHERE round_id = ?",
+    ).bind(roundId).first<{ count: number }>()).toMatchObject({ count: 1 });
+  });
+
+  it("does not reopen an alert that Telegram has already confirmed", async () => {
+    const roundId = "round-sent-alert";
+    await env.DB.prepare(
+      `INSERT INTO discovery_rounds
+       (id, round_slot, scheduled_at, portfolio_revision, budget_state, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'test', 'NORMAL', 'running', ?, ?)`,
+    ).bind(roundId, roundId, now.toISOString(), now.toISOString(), now.toISOString()).run();
+    const { observation, vacancyId } = await persist({ id: "already-sent", title: "Junior Backend Software Developer" });
+    const first = await evaluateAndPersist(env.DB, {
+      vacancyId, observation: { ...observation, roundId }, discoveryQuery: initialQueries.find((query) => query.id === "role-backend")!,
+      profile: defaultRelevanceProfile, now, channel: "telegram", destinationKey: "sent-test-destination",
+    });
+    await env.DB.prepare("UPDATE alert_intents SET status = 'sent', delivered_at = ? WHERE decision_id = ?")
+      .bind(now.toISOString(), first.decisionId).run();
+    await evaluateAndPersist(env.DB, {
+      vacancyId, observation: { ...observation, queryId: "broad-software", roundId }, discoveryQuery: initialQueries.find((query) => query.id === "broad-software")!,
+      profile: defaultRelevanceProfile, now: new Date(now.getTime() + 1_000), channel: "telegram", destinationKey: "sent-test-destination",
+    });
+    expect(await env.DB.prepare("SELECT status, delivered_at FROM alert_intents WHERE vacancy_id = ?")
+      .bind(vacancyId).first()).toMatchObject({ status: "sent", delivered_at: now.toISOString() });
+  });
 });
