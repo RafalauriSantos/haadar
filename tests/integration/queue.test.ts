@@ -166,6 +166,8 @@ describe("persistent queue lifecycle", () => {
     expect(published).toContainEqual(expect.objectContaining({ body: expect.objectContaining({ id: task.id, deliveryMode: "silent" }) }));
     const after = await env.DB.prepare("SELECT COUNT(*) AS count FROM discovery_rounds").first<{ count: number }>();
     expect(after?.count).toBe(before?.count);
+    expect(await env.DB.prepare("SELECT event_type FROM operational_events WHERE event_key = ?")
+      .bind("maintenance:2026-10-04T08:10:00.000Z").first()).toMatchObject({ event_type: "scheduled_maintenance" });
   });
 
   it.each(["permanent", "blocked", "schema_changed"] as const)("treats %s as terminal", async (kind) => {

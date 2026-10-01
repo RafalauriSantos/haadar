@@ -9,7 +9,7 @@ import { consumeMessage } from "./queue/consumer";
 import type { DiscoveryTaskMessage } from "./queue/messages";
 import { parseMessage } from "./queue/messages";
 import { admitRound } from "./discovery/round-coordinator";
-import { markTaskPublished } from "./storage/d1";
+import { markTaskPublished, recordOperationalEvent } from "./storage/d1";
 import { pausedSourceIds } from "./storage/source-health";
 import { recoverExpiredTaskPublications } from "./storage/tasks";
 import { recordUsage } from "./observability/usage-ledger";
@@ -161,6 +161,11 @@ const worker = {
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     const scheduledAt = new Date(controller.scheduledTime);
     if (!env.DB) throw new Error("D1 binding is required for scheduled maintenance");
+    await recordOperationalEvent(env.DB, {
+      eventKey: `maintenance:${scheduledAt.toISOString()}`,
+      eventType: "scheduled_maintenance",
+      payload: { state: "started" },
+    });
     await reconcileConfirmedDeliveries(env.DB, scheduledAt);
     if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
       try {
