@@ -34,7 +34,7 @@ export class GitHubIssuesAdapter implements SourceAdapter {
           ...this.source.limits,
           maxBytes: this.source.limits.maxResponseBytes,
           allowedHosts: this.source.allowedHosts,
-          headers: { "x-github-api-version": "2022-11-28" },
+          headers: { "x-github-api-version": "2022-11-28", "user-agent": "Haadar vacancy discovery" },
           fetcher: this.fetcher,
         },
       );

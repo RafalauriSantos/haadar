@@ -18,9 +18,11 @@ describe("GitHub Issues adapter", () => {
   it("fetches one public issue listing, skips pull requests and attributes matching queries", async () => {
     let requestedUrl = "";
     let apiVersion = "";
+    let userAgent = "";
     const adapter = new GitHubIssuesAdapter(source, queries, () => new Date("2026-10-01T12:00:00.000Z"), async (input, init) => {
       requestedUrl = String(input);
       apiVersion = new Headers(init?.headers).get("x-github-api-version") ?? "";
+      userAgent = new Headers(init?.headers).get("user-agent") ?? "";
       return jsonResponse([
         {
           id: 42,
@@ -44,6 +46,7 @@ describe("GitHub Issues adapter", () => {
 
     expect(requestedUrl).toBe("https://api.github.com/repos/backend-br/vagas/issues?state=open&sort=created&direction=desc&per_page=50");
     expect(apiVersion).toBe("2022-11-28");
+    expect(userAgent).toBe("Haadar vacancy discovery");
     expect(result.diagnostics).toEqual([]);
     expect(result.observations.map((item) => item.queryId)).toEqual(["role", "stack"]);
     expect(result.observations[0]).toMatchObject({
