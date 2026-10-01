@@ -24,4 +24,10 @@ describe("Google News RSS adapter", () => {
     await adapter.discover({ id: "task", roundId: "round", queryId: "board", adapterId: rssSources[0].id, idempotencyKey: "key", attempt: 0 });
     expect(headers).toMatchObject({ "user-agent": "Haadar vacancy discovery" });
   });
+
+  it("accepts Google News GUID elements with attributes", async () => {
+    const adapter = new GoogleNewsRssAdapter(rssSources[0], [{ id: "role", revision: "1", family: "ROLE", terms: ["java"], exclusions: [], priority: 1, estimatedCost: 1, active: true }], () => new Date("2026-10-01T12:00:00Z"), async () => new Response(`<?xml version="1.0"?><rss><channel><item><guid isPermaLink="false">rss-attribute</guid><title>Vaga Desenvolvedor Java Junior</title><link>https://news.google.com/rss/articles/abc</link><pubDate>Wed, 01 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }));
+    const result = await adapter.discover({ id: "task", roundId: "round", queryId: "board", adapterId: rssSources[0].id, idempotencyKey: "key", attempt: 0 });
+    expect(result).toMatchObject({ diagnostics: [], observations: [expect.objectContaining({ sourceVacancyId: "rss-attribute" })] });
+  });
 });
