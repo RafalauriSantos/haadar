@@ -1,6 +1,6 @@
 # LinkedIn guest pilot validation
 
-- [ ] User explicitly approved activation of the three guest searches.
+- [x] User explicitly approved activation of the three guest searches.
 - [x] All automated tests passed on the exact commit.
 - [x] Production deploy completed with guest sources still inactive.
 - [ ] First active hourly round has no `blocked` or `schema_changed` LinkedIn diagnostic.
@@ -12,7 +12,7 @@
 
 Source IDs: `linkedin-guest:desenvolvedor-java-junior`, `linkedin-guest:desenvolvedor-node-junior`, and `linkedin-guest:desenvolvedor-full-stack-junior`.
 
-The sources stay inactive until explicit approval. Do not enter production evidence before activation: task diagnostics, real observations, decisions, alert intents and Telegram deliveries belong to the controlled active pilot only.
+Activation was explicitly approved on 2026-10-01. Task diagnostics, real observations, decisions, alert intents and Telegram deliveries are recorded only from normal hourly rounds after the active deployment.
 
 ## Inactive deployment evidence
 
@@ -21,6 +21,13 @@ The sources stay inactive until explicit approval. Do not enter production evide
 - Production Worker version: `5b11f6f6-ebf0-4809-b9da-a15abb86074c`
 - Schedule unchanged: `0 * * * *`.
 - The three definitions remain `active: false`; no LinkedIn guest task was created or manually triggered.
+
+## Active pilot deployment evidence
+
+- Activation commit: `247b3e0` (only the guest-source activation configuration and its matching assertion changed).
+- Production Worker version: `805b083b-1755-4245-8ca0-9ccbab9cd3a3`.
+- Deployment completed at 2026-10-01T10:08:50Z with the existing hourly schedule unchanged.
+- No manual discovery or test alert was sent. The first evidence must come from a normal hourly round after this deployment.
 
 ## Removal decision
 
