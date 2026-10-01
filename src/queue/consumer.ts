@@ -8,6 +8,7 @@ import { evaluateAndPersist } from "../decision/pipeline";
 import { initialQueries } from "../portfolio/query-portfolio";
 import { defaultRelevanceProfile } from "../portfolio/sources";
 import type { EnrichmentWorkflowParams } from "../workflows/enrichment";
+import { recordSourceSuccess, recordSourceTerminalFailure } from "../storage/source-health";
 
 export type ConsumeAction =
   | { action: "ack"; outcome: "completed" | "terminal" | "already_terminal"; reason?: string }
@@ -157,6 +158,7 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       status: "completed",
       now: now.toISOString(),
     });
+    await recordSourceSuccess(input.db, input.task.adapterId, now);
     return { action: "ack", outcome: "completed" };
   } catch (error) {
     const errorKind = error instanceof Error ? error.name : "UnknownError";
@@ -217,4 +219,13 @@ async function completeTerminal(
     adapterId: input.task.adapterId,
     payload: { reason, errorKind: errorKind ?? null },
   });
+  const health = await recordSourceTerminalFailure(input.db, input.task.adapterId, errorKind ?? reason, now);
+  if (health.pausedUntil) {
+    await recordOperationalEvent(input.db, {
+      eventKey: `source:${input.task.adapterId}:paused:${health.pausedUntil}`,
+      eventType: "source_paused",
+      adapterId: input.task.adapterId,
+      payload: { reason: errorKind ?? reason },
+    });
+  }
 }

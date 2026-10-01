@@ -14,6 +14,7 @@ interface SourceDefinitionBase {
   applicableQueryFamilies: Array<"BROAD" | "ROLE" | "STACK" | "CONTEXT" | "COMPANY" | "EXPERIMENTAL">;
   limits: SourceLimits;
   active: boolean;
+  dispatchDelaySeconds?: number;
 }
 
 export interface GreenhouseSourceDefinition extends SourceDefinitionBase {
@@ -155,7 +156,7 @@ export const linkedinGuestSources: LinkedInGuestSourceDefinition[] = [
   "Desenvolvedor Java Junior",
   "Desenvolvedor Node Junior",
   "Desenvolvedor Full Stack Junior",
-].map((keywords) => ({
+].map((keywords, index) => ({
   id: `linkedin-guest:${keywords.toLowerCase().replaceAll(" ", "-")}`,
   adapterId: "linkedin-guest",
   keywords,
@@ -167,6 +168,7 @@ export const linkedinGuestSources: LinkedInGuestSourceDefinition[] = [
   applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"],
   limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 25 },
   active: true,
+  dispatchDelaySeconds: index * 180,
 }));
 
 export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources, ...rssSources, ...linkedinGuestSources];

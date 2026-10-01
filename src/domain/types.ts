@@ -23,6 +23,7 @@ export interface DiscoveryTask {
   idempotencyKey: string;
   attempt: number;
   publicationLeaseToken?: string;
+  deliveryMode?: "live" | "silent";
 }
 
 export interface QueryDefinition {

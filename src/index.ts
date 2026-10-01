@@ -10,6 +10,7 @@ import type { DiscoveryTaskMessage } from "./queue/messages";
 import { parseMessage } from "./queue/messages";
 import { admitRound } from "./discovery/round-coordinator";
 import { markTaskPublished } from "./storage/d1";
+import { pausedSourceIds } from "./storage/source-health";
 import { reconcileExpiredTaskLeases } from "./storage/tasks";
 import { recordUsage } from "./observability/usage-ledger";
 import { utcDay } from "./budget/reservations";
@@ -50,19 +51,30 @@ export function createAdapters(sources: SourceDefinition[], fetcher?: typeof fet
   ]));
 }
 
-async function runDiscoveryRound(env: Env, scheduledAt: Date, roundSlot?: string): Promise<{ roundId: string; admittedTasks: number }> {
+async function runDiscoveryRound(
+  env: Env,
+  scheduledAt: Date,
+  roundSlot?: string,
+  deliveryMode: "live" | "silent" = "live",
+): Promise<{ roundId: string; admittedTasks: number; deliveryMode: "live" | "silent" }> {
   if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for scheduled discovery");
   await reconcileExpiredTaskLeases(env.DB, scheduledAt.toISOString());
+  const paused = await pausedSourceIds(env.DB, scheduledAt);
+  const activeSources = pilotSources.filter((source) => source.active && !paused.has(source.id));
   const admission = await admitRound({
     db: env.DB,
     scheduledAt,
     roundSlot,
     portfolio: { revision: "portfolio-v2-greenhouse-pilot", queries: initialQueries },
-    adapterIds: pilotSources.filter((source) => source.active).map((source) => source.id),
+    adapterIds: activeSources.map((source) => source.id),
     boardOnceAdapters: true,
   });
   if (admission.tasks.length > 0) {
-    await env.HAADAR_DISCOVERY.sendBatch(admission.tasks.map((task) => ({ body: task })));
+    const sourcesById = new Map(activeSources.map((source) => [source.id, source]));
+    await env.HAADAR_DISCOVERY.sendBatch(admission.tasks.map((task) => ({
+      body: { ...task, deliveryMode },
+      delaySeconds: sourcesById.get(task.adapterId)?.dispatchDelaySeconds,
+    })));
     await Promise.all(admission.tasks.map(async (task) => {
       if (!task.publicationLeaseToken) throw new Error("publication lease token is required");
       const marked = await markTaskPublished(env.DB!, task.id, task.publicationLeaseToken);
@@ -70,7 +82,7 @@ async function runDiscoveryRound(env: Env, scheduledAt: Date, roundSlot?: string
       await recordUsage(env.DB!, `task:${task.id}:queue-publish`, utcDay(scheduledAt), "queue_operations", 1);
     }));
   }
-  return { roundId: admission.round.id, admittedTasks: admission.tasks.length };
+  return { roundId: admission.round.id, admittedTasks: admission.tasks.length, deliveryMode };
 }
 
 const worker = {
@@ -92,7 +104,13 @@ const worker = {
       const requestedAt = new URL(request.url).searchParams.get("scheduledAt");
       const scheduledAt = requestedAt ? new Date(requestedAt) : new Date();
       if (Number.isNaN(scheduledAt.getTime())) return Response.json({ error: "invalid_scheduled_at" }, { status: 400 });
-      return Response.json(await runDiscoveryRound(env, scheduledAt, `manual:${scheduledAt.toISOString()}`), { status: 202 });
+      const notify = new URL(request.url).searchParams.get("notify") === "true";
+      return Response.json(await runDiscoveryRound(
+        env,
+        scheduledAt,
+        `manual:${scheduledAt.toISOString()}`,
+        notify ? "live" : "silent",
+      ), { status: 202 });
     }
     if (pathname === "/admin/dispatch" && request.method === "POST") {
       if (!env.ADMIN_TRIGGER_TOKEN || request.headers.get("authorization") !== `Bearer ${env.ADMIN_TRIGGER_TOKEN}`) {
@@ -154,10 +172,10 @@ const worker = {
           adapters,
           maxAttempts: 4,
           enrichmentWorkflow: env.ENRICHMENT_WORKFLOW,
-          alertChannel: env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? "telegram" : undefined,
-          alertDestinationKey: env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? env.TELEGRAM_DESTINATION : undefined,
+          alertChannel: parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? "telegram" : undefined,
+          alertDestinationKey: parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? env.TELEGRAM_DESTINATION : undefined,
         });
-        if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
+        if (parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
           await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION));
         }
         if (outcome.action === "ack") message.ack();

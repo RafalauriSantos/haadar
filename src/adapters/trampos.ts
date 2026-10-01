@@ -9,7 +9,7 @@ export class TramposAdapter implements SourceAdapter {
   constructor(private readonly source: TramposSourceDefinition, private readonly queries: QueryDefinition[], private readonly observedAt: () => Date = () => new Date(), private readonly fetcher: typeof fetch = fetch) { this.id = source.id; }
   async discover(_task: DiscoveryTask): Promise<AdapterResult> {
     try {
-      const raw = await fetchBoundedJson("https://trampos.co/api/v2/opportunities?page=1", { ...this.source.limits, maxBytes: this.source.limits.maxResponseBytes, allowedHosts: this.source.allowedHosts, fetcher: this.fetcher });
+      const raw = await fetchBoundedJson("https://trampos.co/api/v2/opportunities?page=1", { ...this.source.limits, maxBytes: this.source.limits.maxResponseBytes, allowedHosts: this.source.allowedHosts, headers: { "user-agent": "Haadar vacancy discovery" }, fetcher: this.fetcher });
       const opportunities = (raw as { opportunities?: unknown }).opportunities;
       if (!Array.isArray(opportunities) || opportunities.length > this.source.limits.maxRecords) throw new AdapterHttpError("schema_changed", "opportunities_array_missing");
       const observations: NormalizedObservation[] = [];

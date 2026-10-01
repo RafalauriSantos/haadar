@@ -63,6 +63,7 @@ export async function evaluateAndPersist(
     score,
     decision,
     earlySignalKey: provisional?.idempotencyKey,
+    roundId: input.observation.roundId,
     channel: input.channel ?? "pending_configuration",
     destinationKey: input.destinationKey ?? "pending_configuration",
     payload: {

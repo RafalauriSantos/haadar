@@ -6,6 +6,8 @@ import { admitRound } from "../../src/discovery/round-coordinator";
 import worker, { createAdapters } from "../../src/index";
 import { consumeMessage, retryDelay } from "../../src/queue/consumer";
 import { linkedinGuestSources } from "../../src/portfolio/sources";
+import { parseMessage } from "../../src/queue/messages";
+import { getSourceHealth } from "../../src/storage/source-health";
 
 const usage = { workersRequests: 0, queueOperations: 0, d1RowsRead: 0, d1RowsWritten: 0, workflowSteps: 0, aiNeurons: 0 };
 
@@ -79,6 +81,33 @@ describe("persistent queue lifecycle", () => {
     const stored = await env.DB.prepare("SELECT payload_json FROM operational_events WHERE task_id = ?")
       .bind(retryTask.id).all<{ payload_json: string }>();
     expect(JSON.stringify(stored.results)).not.toContain("secret-like response");
+    expect(await getSourceHealth(env.DB, "test")).toMatchObject({ consecutiveFailures: 1, pausedUntil: null });
+  });
+
+  it("pauses a repeatedly terminal source, while a successful task clears its failure count", async () => {
+    for (let index = 0; index < 3; index += 1) {
+      const task = await createTask(`2026-10-04T0${index}:00:00.000Z`, "health-source");
+      await consumeMessage({
+        db: env.DB,
+        task,
+        queueAttempts: 1,
+        adapters: { "health-source": adapter([{ kind: "blocked", message: "blocked" }]) },
+        maxAttempts: 4,
+        now: new Date(`2026-10-04T0${index}:00:00.000Z`),
+      });
+    }
+    expect(await getSourceHealth(env.DB, "health-source")).toMatchObject({ consecutiveFailures: 3 });
+    expect(Date.parse((await getSourceHealth(env.DB, "health-source"))!.pausedUntil!)).toBeGreaterThan(Date.parse("2026-10-04T02:00:00.000Z"));
+
+    const recovered = await createTask("2026-10-04T04:00:00.000Z", "health-source");
+    await consumeMessage({ db: env.DB, task: recovered, queueAttempts: 1, adapters: { "health-source": adapter() }, maxAttempts: 4 });
+    expect(await getSourceHealth(env.DB, "health-source")).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
+  });
+
+  it("accepts a silent manual task mode and rejects unknown delivery modes", async () => {
+    const task = await createTask("2026-10-04T05:00:00.000Z", "test");
+    expect(parseMessage({ ...task, deliveryMode: "silent" })).toMatchObject({ ok: true });
+    expect(parseMessage({ ...task, deliveryMode: "loud" })).toEqual({ ok: false, reason: "invalid_schema" });
   });
 
   it.each(["permanent", "blocked", "schema_changed"] as const)("treats %s as terminal", async (kind) => {

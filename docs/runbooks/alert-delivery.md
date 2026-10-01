@@ -13,6 +13,18 @@ bounded next attempt. A rejected destination becomes failed. A transport
 timeout becomes `unknown`: Telegram may have accepted it, so Haadar does not
 blindly retry.
 
+## Delivery guardrails
+
+At most five eligible vacancies create Telegram intents in one discovery
+round. Collection and decision evidence continue after that limit; only the
+additional notifications are withheld. This keeps an unusually broad source
+response from flooding the destination.
+
+`POST /admin/discovery` is silent by default: it collects, persists and
+evaluates vacancies without creating Telegram intents or attempting delivery.
+An operator must explicitly add `?notify=true` to a controlled manual run that
+is intended to notify the approved destination.
+
 ## Prevention and recovery
 
 The persisted vacancy payload uses `canonicalUrl`; the delivery formatter maps

@@ -36,4 +36,19 @@ describe("bounded text transport", () => {
       fetcher: async () => new Response("too large", { headers: { "content-type": "text/html" } }),
     })).rejects.toMatchObject({ kind: "permanent", message: "response_too_large" });
   });
+
+  it("supports bounded POST responses with an explicit set of accepted media types", async () => {
+    let request: RequestInit | undefined;
+    await expect(fetchBoundedText("https://www.linkedin.com/jobs", {
+      ...options,
+      method: "POST",
+      body: "{\"query\":\"backend\"}",
+      expectedContentTypes: ["application/json", "text/event-stream"],
+      fetcher: async (_url, init) => {
+        request = init;
+        return new Response("data: {}", { headers: { "content-type": "text/event-stream" } });
+      },
+    })).resolves.toBe("data: {}");
+    expect(request).toMatchObject({ method: "POST", body: "{\"query\":\"backend\"}", redirect: "manual" });
+  });
 });

@@ -17,6 +17,8 @@ export interface BoundedFetchOptions {
   maxBytes: number;
   maxRedirects?: number;
   headers?: HeadersInit;
+  method?: "GET" | "POST";
+  body?: BodyInit | null;
   fetcher?: typeof fetch;
 }
 
@@ -29,9 +31,10 @@ export async function fetchBoundedJson(url: string, options: BoundedFetchOptions
   }
 }
 
-interface BoundedTextFetchOptions extends BoundedFetchOptions {
+export interface BoundedTextFetchOptions extends BoundedFetchOptions {
   accept?: string;
   expectedContentType?: string;
+  expectedContentTypes?: string[];
 }
 
 export async function fetchBoundedText(url: string, options: BoundedTextFetchOptions): Promise<string> {
@@ -44,7 +47,8 @@ export async function fetchBoundedText(url: string, options: BoundedTextFetchOpt
       let response: Response;
       try {
         response = await fetcher(current, {
-          method: "GET",
+          method: options.method ?? "GET",
+          body: options.body,
           redirect: "manual",
           signal: controller.signal,
           headers: { accept: options.accept ?? "text/html", ...options.headers },
@@ -70,8 +74,8 @@ export async function fetchBoundedText(url: string, options: BoundedTextFetchOpt
       if (!response.ok) throw new AdapterHttpError("permanent", `http_${response.status}`);
 
       const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
-      const expectedContentType = options.expectedContentType ?? "text/html";
-      if (!contentType.includes(expectedContentType)) {
+      const expectedContentTypes = options.expectedContentTypes ?? [options.expectedContentType ?? "text/html"];
+      if (!expectedContentTypes.some((expected) => contentType.includes(expected))) {
         throw new AdapterHttpError("schema_changed", "unexpected_content_type");
       }
       return readBoundedBody(response, options.maxBytes);

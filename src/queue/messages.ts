@@ -25,6 +25,9 @@ export function parseMessage(body: unknown): MessageValidation {
     return { ok: false, reason: "invalid_schema" };
   }
   if (!Number.isInteger(value.attempt) || (value.attempt as number) < 0) return { ok: false, reason: "invalid_schema" };
+  if (value.deliveryMode !== undefined && value.deliveryMode !== "live" && value.deliveryMode !== "silent") {
+    return { ok: false, reason: "invalid_schema" };
+  }
   return { ok: true, value: body as DiscoveryTaskMessage };
 }
 

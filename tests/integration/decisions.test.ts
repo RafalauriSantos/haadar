@@ -112,4 +112,32 @@ describe("persisted decisions and early intents", () => {
     const second = await evaluateAndPersist(env.DB, { vacancyId, observation, discoveryQuery: { ...query, revision: "2" }, profile: defaultRelevanceProfile, now });
     expect(second.decisionId).not.toBe(first.decisionId);
   });
+
+  it("limits Telegram intents to five distinct eligible vacancies in one discovery round", async () => {
+    const roundId = "round-alert-limit";
+    await env.DB.prepare(
+      `INSERT INTO discovery_rounds
+       (id, round_slot, scheduled_at, portfolio_revision, budget_state, status, created_at, updated_at)
+       VALUES (?, ?, ?, 'test', 'NORMAL', 'running', ?, ?)`,
+    ).bind(roundId, roundId, now.toISOString(), now.toISOString(), now.toISOString()).run();
+    for (let index = 0; index < 6; index += 1) {
+      const { observation, vacancyId } = await persist({
+        id: `round-limit-${index}`,
+        title: "Junior Backend Software Developer",
+      });
+      await evaluateAndPersist(env.DB, {
+        vacancyId,
+        observation: { ...observation, roundId },
+        discoveryQuery: initialQueries.find((query) => query.id === "role-backend")!,
+        profile: defaultRelevanceProfile,
+        now,
+        channel: "telegram",
+        destinationKey: "test-destination",
+      });
+    }
+    const intents = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM alert_intents WHERE channel = 'telegram' AND destination_key = 'test-destination'",
+    ).first<{ count: number }>();
+    expect(intents?.count).toBe(5);
+  });
 });
