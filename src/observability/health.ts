@@ -5,6 +5,9 @@ export interface OperationalHealthSummary {
   budgetState: string | null;
   failingAdapters: number;
   oldestQueuedWork: string | null;
+  expiredLeases: number;
+  pausedSources: number;
+  deliveryBacklog: number;
   notificationHealth: "unknown" | "pending" | "healthy" | "degraded";
 }
 
@@ -18,7 +21,7 @@ export async function getOperationalHealth(db: D1Database, now = new Date()): Pr
      WHERE status IN ('completed', 'partial', 'deferred')
      ORDER BY updated_at DESC LIMIT 1`,
   ).first<{ id: string; status: "completed" | "partial" | "deferred"; updated_at: string }>();
-  const [observed, terminal, latestBudget, failingAdapters, oldestQueued, pendingAlerts, failedAlerts, sentAlerts] = await Promise.all([
+  const [observed, terminal, latestBudget, failingAdapters, oldestQueued, expiredLeases, pausedSources, pendingAlerts, failedAlerts, sentAlerts, deliveryBacklog] = await Promise.all([
     db.prepare("SELECT COUNT(*) AS count FROM discovery_rounds WHERE scheduled_at >= ?").bind(windowStart).first<CountRow>(),
     db.prepare("SELECT COUNT(*) AS count FROM discovery_rounds WHERE scheduled_at >= ? AND status IN ('completed', 'partial', 'deferred')").bind(windowStart).first<CountRow>(),
     db.prepare("SELECT budget_state FROM discovery_rounds ORDER BY scheduled_at DESC LIMIT 1").first<{ budget_state: string }>(),
@@ -30,9 +33,19 @@ export async function getOperationalHealth(db: D1Database, now = new Date()): Pr
       `SELECT MIN(created_at) AS created_at FROM discovery_tasks
        WHERE status IN ('pending', 'running', 'retryable')`,
     ).first<{ created_at: string | null }>(),
+    db.prepare(
+      `SELECT COUNT(*) AS count FROM discovery_tasks
+       WHERE status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?`,
+    ).bind(asOf).first<CountRow>(),
+    db.prepare(
+      "SELECT COUNT(*) AS count FROM source_health WHERE paused_until IS NOT NULL AND paused_until > ?",
+    ).bind(asOf).first<CountRow>(),
     db.prepare("SELECT COUNT(*) AS count FROM alert_intents WHERE status = 'pending'").first<CountRow>(),
     db.prepare("SELECT COUNT(*) AS count FROM alert_intents WHERE status = 'failed'").first<CountRow>(),
     db.prepare("SELECT COUNT(*) AS count FROM alert_intents WHERE status = 'sent'").first<CountRow>(),
+    db.prepare(
+      "SELECT COUNT(*) AS count FROM notification_deliveries WHERE state IN ('pending', 'retryable', 'unknown')",
+    ).first<CountRow>(),
   ]);
   const expected = 24;
   const pending = pendingAlerts?.count ?? 0;
@@ -45,6 +58,9 @@ export async function getOperationalHealth(db: D1Database, now = new Date()): Pr
     budgetState: latestBudget?.budget_state ?? null,
     failingAdapters: failingAdapters?.count ?? 0,
     oldestQueuedWork: oldestQueued?.created_at ?? null,
-    notificationHealth: failed > 0 ? "degraded" : pending > 0 ? "pending" : sent > 0 ? "healthy" : "unknown",
+    expiredLeases: expiredLeases?.count ?? 0,
+    pausedSources: pausedSources?.count ?? 0,
+    deliveryBacklog: deliveryBacklog?.count ?? 0,
+    notificationHealth: failed > 0 || (deliveryBacklog?.count ?? 0) > 0 ? "degraded" : pending > 0 ? "pending" : sent > 0 ? "healthy" : "unknown",
   };
 }
