@@ -34,8 +34,9 @@ export interface GupySourceDefinition extends SourceDefinitionBase {
 export interface TramposSourceDefinition extends SourceDefinitionBase {
   adapterId: "trampos";
 }
+export interface RssSourceDefinition extends SourceDefinitionBase { adapterId: "google-news-rss"; feedUrl: string; }
 
-export type SourceDefinition = GreenhouseSourceDefinition | GitHubIssuesSourceDefinition | GupySourceDefinition | TramposSourceDefinition;
+export type SourceDefinition = GreenhouseSourceDefinition | GitHubIssuesSourceDefinition | GupySourceDefinition | TramposSourceDefinition | RssSourceDefinition;
 
 export const greenhouseSources: GreenhouseSourceDefinition[] = [{
   id: "greenhouse:planetscale",
@@ -138,8 +139,13 @@ export const gupySources: GupySourceDefinition[] = [
 export const tramposSources: TramposSourceDefinition[] = [
   { id: "trampos:development", adapterId: "trampos", organization: "Trampos.co", allowedHosts: ["trampos.co"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 50 }, active: true },
 ];
+export const rssSources: RssSourceDefinition[] = [
+  { id: "rss:goomer", adapterId: "google-news-rss", feedUrl: "https://news.google.com/rss/search?q=%22Goomer%22+(vaga+OR+contratando+OR+oportunidade+OR+desenvolvedor+OR+programador)&hl=pt-BR&gl=BR&ceid=BR:pt-419", organization: "Google News: Goomer", allowedHosts: ["news.google.com"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 256 * 1024, maxRequestsPerTask: 1, maxRecords: 30 }, active: true },
+  { id: "rss:gft", adapterId: "google-news-rss", feedUrl: "https://news.google.com/rss/search?q=site:jobs.gft.com+(Brasil+OR+Sorocaba+OR+Remoto)&hl=pt-BR&gl=BR&ceid=BR:pt-419", organization: "Google News: GFT", allowedHosts: ["news.google.com"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 256 * 1024, maxRequestsPerTask: 1, maxRecords: 30 }, active: true },
+  { id: "rss:indeed-junior", adapterId: "google-news-rss", feedUrl: "https://news.google.com/rss/search?q=site:br.indeed.com+(desenvolvedor+OR+developer+OR+programador+OR+software)+(junior+OR+jr+OR+estagio)+remoto&hl=pt-BR&gl=BR&ceid=BR:pt-419", organization: "Google News: Indeed", allowedHosts: ["news.google.com"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 256 * 1024, maxRequestsPerTask: 1, maxRecords: 30 }, active: true },
+];
 
-export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources];
+export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources, ...rssSources];
 
 export interface RelevanceProfile {
   roles: string[];

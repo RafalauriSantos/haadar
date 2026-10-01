@@ -89,7 +89,12 @@ describe("reliable discovery identity", () => {
       publicationLeaseMs: 1_000,
     });
     expect(recovered.tasks).toHaveLength(1);
-    expect(await markTaskPublished(env.DB, recovered.tasks[0].id, recovered.tasks[0].publicationLeaseToken!)).toBe(true);
+    expect(await markTaskPublished(
+      env.DB,
+      recovered.tasks[0].id,
+      recovered.tasks[0].publicationLeaseToken!,
+      new Date(time.getTime() + 1_001).toISOString(),
+    )).toBe(true);
 
     const afterPublish = await admitRound({
       db: env.DB,

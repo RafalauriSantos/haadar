@@ -2,6 +2,7 @@ import { GreenhouseAdapter } from "./adapters/greenhouse";
 import { GitHubIssuesAdapter } from "./adapters/github-issues";
 import { GupyAdapter } from "./adapters/gupy";
 import { TramposAdapter } from "./adapters/trampos";
+import { GoogleNewsRssAdapter } from "./adapters/rss";
 import { consumeMessage } from "./queue/consumer";
 import type { DiscoveryTaskMessage } from "./queue/messages";
 import { parseMessage } from "./queue/messages";
@@ -132,7 +133,9 @@ const worker = {
               ? new GitHubIssuesAdapter(source, initialQueries)
               : source.adapterId === "gupy"
                 ? new GupyAdapter(source, initialQueries)
-                : new TramposAdapter(source, initialQueries),
+                : source.adapterId === "trampos"
+                  ? new TramposAdapter(source, initialQueries)
+                  : new GoogleNewsRssAdapter(source, initialQueries),
         ]));
         const outcome = await consumeMessage({
           db: env.DB,

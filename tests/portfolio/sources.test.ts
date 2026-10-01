@@ -4,7 +4,7 @@ import { initialQueries } from "../../src/portfolio/query-portfolio";
 
 describe("public source contracts", () => {
   it("keeps every source bounded to one public board request", () => {
-    expect(pilotSources).toHaveLength(12);
+    expect(pilotSources).toHaveLength(15);
     expect(pilotSources[0]).toMatchObject({
       id: "greenhouse:planetscale",
       fetchStrategy: "board_once",
