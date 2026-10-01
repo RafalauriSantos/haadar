@@ -258,7 +258,7 @@ export interface OperationalEvent {
   payload: Record<string, unknown>;
 }
 
-const operationalPayloadKeys = new Set(["kind", "reason", "errorKind", "attempts", "count", "state"]);
+const operationalPayloadKeys = new Set(["kind", "reason", "errorKind", "attempts", "count", "state", "httpStatus"]);
 
 function safeOperationalPayload(payload: Record<string, unknown>): Record<string, string | number | boolean | null> {
   const safe: Record<string, string | number | boolean | null> = {};

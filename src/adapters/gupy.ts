@@ -22,7 +22,7 @@ export class GupyAdapter implements SourceAdapter {
         for (const query of matching) observations.push({ sourceId: this.source.id, sourceVacancyId: String(job.id), canonicalUrl: url, title, organization: job.careerPageName ?? "Gupy", location: location || undefined, workModel: explicitWorkModel(location, description), descriptionSummary: description || undefined, observedAt: this.observedAt().toISOString(), queryId: query.id, fingerprint, fingerprintVersion: "v1", originKind: "real" });
       }
       return { sourceId: this.id, observations, diagnostics: [] };
-    } catch (error) { return { sourceId: this.id, observations: [], diagnostics: [{ kind: error instanceof AdapterHttpError ? error.kind : "schema_changed", message: error instanceof AdapterHttpError ? error.message : "gupy_payload_invalid" }] }; }
+    } catch (error) { return { sourceId: this.id, observations: [], diagnostics: [{ kind: error instanceof AdapterHttpError ? error.kind : "schema_changed", message: error instanceof AdapterHttpError ? error.message : "gupy_payload_invalid", httpStatus: error instanceof AdapterHttpError ? error.httpStatus : undefined }] }; }
   }
 }
 

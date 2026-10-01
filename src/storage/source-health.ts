@@ -43,19 +43,30 @@ export async function recordSourceTerminalFailure(
   failureKind: string,
   now: Date,
 ): Promise<SourceHealth> {
-  const existing = await getSourceHealth(db, sourceId);
-  const consecutiveFailures = (existing?.consecutiveFailures ?? 0) + 1;
-  const pausedUntil = consecutiveFailures >= FAILURE_THRESHOLD
-    ? new Date(now.getTime() + PAUSE_MS).toISOString()
-    : null;
-  await db.prepare(
+  const pauseCandidate = new Date(now.getTime() + PAUSE_MS).toISOString();
+  const row = await db.prepare(
     `INSERT INTO source_health (source_id, consecutive_failures, last_failure_kind, paused_until, updated_at)
-     VALUES (?, ?, ?, ?, ?)
+     VALUES (?, 1, ?, NULL, ?)
      ON CONFLICT(source_id) DO UPDATE SET
-       consecutive_failures = excluded.consecutive_failures,
+       consecutive_failures = source_health.consecutive_failures + 1,
        last_failure_kind = excluded.last_failure_kind,
-       paused_until = excluded.paused_until,
-       updated_at = excluded.updated_at`,
-  ).bind(sourceId, consecutiveFailures, failureKind, pausedUntil, now.toISOString()).run();
-  return { sourceId, consecutiveFailures, pausedUntil, lastFailureKind: failureKind };
+       paused_until = CASE
+         WHEN source_health.consecutive_failures + 1 >= ? THEN ?
+         ELSE NULL
+       END,
+       updated_at = excluded.updated_at
+     RETURNING source_id, consecutive_failures, paused_until, last_failure_kind`,
+  ).bind(sourceId, failureKind, now.toISOString(), FAILURE_THRESHOLD, pauseCandidate).first<{
+    source_id: string;
+    consecutive_failures: number;
+    paused_until: string | null;
+    last_failure_kind: string | null;
+  }>();
+  if (!row) throw new Error("source health update did not return a row");
+  return {
+    sourceId: row.source_id,
+    consecutiveFailures: row.consecutive_failures,
+    pausedUntil: row.paused_until,
+    lastFailureKind: row.last_failure_kind,
+  };
 }

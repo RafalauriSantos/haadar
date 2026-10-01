@@ -72,7 +72,7 @@ export class LinkedInGuestAdapter implements SourceAdapter {
       return { sourceId: this.source.id, observations, diagnostics: [] };
     } catch (error) {
       if (error instanceof AdapterHttpError) {
-        return { sourceId: this.source.id, observations: [], diagnostics: [{ kind: error.kind, message: error.message }] };
+        return { sourceId: this.source.id, observations: [], diagnostics: [{ kind: error.kind, message: error.message, httpStatus: error.httpStatus }] };
       }
       return { sourceId: this.source.id, observations: [], diagnostics: [{ kind: "schema_changed", message: "linkedin_guest_payload_invalid" }] };
     }

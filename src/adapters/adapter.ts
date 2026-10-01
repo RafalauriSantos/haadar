@@ -5,6 +5,7 @@ export type AdapterFailureKind = "retryable" | "permanent" | "throttled" | "bloc
 export interface AdapterDiagnostic {
   kind: AdapterFailureKind;
   message: string;
+  httpStatus?: number;
 }
 
 export interface AdapterResult {

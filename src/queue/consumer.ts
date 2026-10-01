@@ -118,7 +118,7 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
         taskId: input.task.id,
         queryId: input.task.queryId,
         adapterId: input.task.adapterId,
-        payload: { kind: diagnostic.kind },
+        payload: { kind: diagnostic.kind, httpStatus: diagnostic.httpStatus ?? null },
       });
     }
 

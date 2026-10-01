@@ -69,6 +69,6 @@ describe("GitHub Issues adapter", () => {
     }));
 
     expect((await malformed.discover(task)).diagnostics[0]).toMatchObject({ kind: "schema_changed" });
-    expect((await throttled.discover(task)).diagnostics[0]).toMatchObject({ kind: "throttled" });
+    expect((await throttled.discover(task)).diagnostics[0]).toMatchObject({ kind: "throttled", httpStatus: 429 });
   });
 });

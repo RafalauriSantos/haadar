@@ -5,6 +5,7 @@ export class AdapterHttpError extends Error {
     readonly kind: AdapterFailureKind,
     message: string,
     readonly retryAfterSeconds?: number,
+    readonly httpStatus?: number,
   ) {
     super(message);
     this.name = "AdapterHttpError";
@@ -66,12 +67,12 @@ export async function fetchBoundedText(url: string, options: BoundedTextFetchOpt
         continue;
       }
       if (response.status === 429) {
-        throw new AdapterHttpError("throttled", "rate_limited", parseRetryAfter(response.headers.get("retry-after")));
+        throw new AdapterHttpError("throttled", "rate_limited", parseRetryAfter(response.headers.get("retry-after")), response.status);
       }
-      if (response.status === 401 || response.status === 403) throw new AdapterHttpError("blocked", `http_${response.status}`);
-      if (response.status === 404) throw new AdapterHttpError("permanent", "board_not_found");
-      if (response.status >= 500) throw new AdapterHttpError("retryable", `http_${response.status}`);
-      if (!response.ok) throw new AdapterHttpError("permanent", `http_${response.status}`);
+      if (response.status === 401 || response.status === 403) throw new AdapterHttpError("blocked", `http_${response.status}`, undefined, response.status);
+      if (response.status === 404) throw new AdapterHttpError("permanent", "board_not_found", undefined, response.status);
+      if (response.status >= 500) throw new AdapterHttpError("retryable", `http_${response.status}`, undefined, response.status);
+      if (!response.ok) throw new AdapterHttpError("permanent", `http_${response.status}`, undefined, response.status);
 
       const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
       const expectedContentTypes = options.expectedContentTypes ?? [options.expectedContentType ?? "text/html"];

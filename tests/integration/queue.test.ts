@@ -1,14 +1,14 @@
 import { env } from "cloudflare:workers";
 import { createExecutionContext, createMessageBatch, getQueueResult } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import type { SourceAdapter } from "../../src/adapters/adapter";
+import type { AdapterDiagnostic, SourceAdapter } from "../../src/adapters/adapter";
 import { admitRound } from "../../src/discovery/round-coordinator";
 import { markTaskPublished } from "../../src/storage/d1";
 import worker, { createAdapters } from "../../src/index";
 import { consumeMessage, retryDelay } from "../../src/queue/consumer";
 import { linkedinGuestSources } from "../../src/portfolio/sources";
 import { parseMessage } from "../../src/queue/messages";
-import { getSourceHealth } from "../../src/storage/source-health";
+import { getSourceHealth, recordSourceTerminalFailure } from "../../src/storage/source-health";
 
 const usage = { workersRequests: 0, queueOperations: 0, d1RowsRead: 0, d1RowsWritten: 0, workflowSteps: 0, aiNeurons: 0 };
 
@@ -27,7 +27,7 @@ async function createTask(slot: string, adapterId = "fixture") {
   return admission.tasks[0];
 }
 
-function adapter(diagnostics: Array<{ kind: "retryable" | "permanent" | "throttled" | "blocked" | "schema_changed"; message: string }> = []): SourceAdapter {
+function adapter(diagnostics: AdapterDiagnostic[] = []): SourceAdapter {
   return {
     id: "test",
     async discover(task) {
@@ -65,7 +65,7 @@ describe("persistent queue lifecycle", () => {
       db: env.DB,
       task: retryTask,
       queueAttempts: 2,
-      adapters: { test: adapter([{ kind: "throttled", message: "remote body must not persist" }]) },
+      adapters: { test: adapter([{ kind: "throttled", message: "remote body must not persist", httpStatus: 429 }]) },
       maxAttempts: 4,
       random: () => 0,
     });
@@ -82,6 +82,7 @@ describe("persistent queue lifecycle", () => {
     const stored = await env.DB.prepare("SELECT payload_json FROM operational_events WHERE task_id = ?")
       .bind(retryTask.id).all<{ payload_json: string }>();
     expect(JSON.stringify(stored.results)).not.toContain("secret-like response");
+    expect(JSON.stringify(stored.results)).toContain("httpStatus\\\":429");
     expect(await getSourceHealth(env.DB, "test")).toMatchObject({ consecutiveFailures: 1, pausedUntil: null });
   });
 
@@ -103,6 +104,15 @@ describe("persistent queue lifecycle", () => {
     const recovered = await createTask("2026-10-04T04:00:00.000Z", "health-source");
     await consumeMessage({ db: env.DB, task: recovered, queueAttempts: 1, adapters: { "health-source": adapter() }, maxAttempts: 4 });
     expect(await getSourceHealth(env.DB, "health-source")).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
+  });
+
+  it("counts concurrent terminal failures without losing a source health update", async () => {
+    const now = new Date("2026-10-04T04:00:00.000Z");
+    await Promise.all(Array.from({ length: 3 }, () => recordSourceTerminalFailure(env.DB, "concurrent-source", "blocked", now)));
+    expect(await getSourceHealth(env.DB, "concurrent-source")).toMatchObject({
+      consecutiveFailures: 3,
+      lastFailureKind: "blocked",
+    });
   });
 
   it("accepts a silent manual task mode and rejects unknown delivery modes", async () => {
