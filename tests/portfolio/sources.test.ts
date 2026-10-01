@@ -39,5 +39,6 @@ describe("public source contracts", () => {
     ]);
     expect(linkedinGuestSources.every((source) => source.active)).toBe(true);
     expect(linkedinGuestSources.every((source) => source.limits.maxRequestsPerTask === 1)).toBe(true);
+    expect(linkedinGuestSources.map((source) => source.dispatchDelaySeconds)).toEqual([0, 180, 360]);
   });
 });
