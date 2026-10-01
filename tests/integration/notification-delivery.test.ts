@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { dispatchOne } from "../../src/notifications/dispatcher";
+import { reconcileConfirmedDeliveries } from "../../src/notifications/reconcile";
 import { createTelegramClient, formatTelegramAlert, type TelegramClient } from "../../src/notifications/telegram";
 
 const now = new Date("2026-10-07T12:00:00.000Z");
@@ -39,6 +40,19 @@ describe("recoverable notification dispatch", () => {
     const client: TelegramClient = { send: async () => ({ kind: "unknown" }) };
     await expect(dispatchOne(env.DB, client, now)).resolves.toBe("unknown");
     expect(await env.DB.prepare("SELECT state FROM notification_deliveries WHERE intent_key = 'delivery-unknown'").first()).toMatchObject({ state: "unknown" });
+  });
+
+  it("repairs a stale pending alert from a confirmed delivery without sending it again", async () => {
+    await insertIntent("delivery-confirmed-history");
+    await env.DB.prepare(
+      `INSERT INTO notification_deliveries
+        (intent_key, state, attempts, provider_message_id, sent_at, created_at, updated_at)
+       VALUES ('delivery-confirmed-history', 'sent', 1, '45', ?, ?, ?)`,
+    ).bind(now.toISOString(), now.toISOString(), now.toISOString()).run();
+
+    await expect(reconcileConfirmedDeliveries(env.DB, now)).resolves.toBe(1);
+    expect(await env.DB.prepare("SELECT status, delivered_at FROM alert_intents WHERE idempotency_key = 'delivery-confirmed-history'").first())
+      .toMatchObject({ status: "sent", delivered_at: now.toISOString() });
   });
 
   it("sends an alert stored with the canonical vacancy URL", async () => {

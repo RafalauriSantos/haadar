@@ -17,6 +17,7 @@ import { utcDay } from "./budget/reservations";
 import { getOperationalHealth } from "./observability/health";
 import { createTelegramClient } from "./notifications/telegram";
 import { dispatchOne } from "./notifications/dispatcher";
+import { reconcileConfirmedDeliveries } from "./notifications/reconcile";
 import { initialQueries } from "./portfolio/query-portfolio";
 import { pilotSources } from "./portfolio/sources";
 import type { SourceDefinition } from "./portfolio/sources";
@@ -158,11 +159,20 @@ const worker = {
 
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     const scheduledAt = new Date(controller.scheduledTime);
+    if (!env.DB) throw new Error("D1 binding is required for scheduled maintenance");
+    await reconcileConfirmedDeliveries(env.DB, scheduledAt);
+    if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
+      try {
+        await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION), scheduledAt);
+      } catch (error) {
+        const errorName = error instanceof Error ? error.name : "UnknownError";
+        console.error(JSON.stringify({ event: "scheduled_dispatch_failed", errorName }));
+      }
+    }
     if (scheduledAt.getUTCMinutes() === 0) {
       await runDiscoveryRound(env, scheduledAt);
       return;
     }
-    if (!env.DB) throw new Error("D1 binding is required for scheduled maintenance");
     const recoveredTasks = await recoverExpiredTaskPublications(env.DB, { now: scheduledAt, leaseMs: 5 * 60_000 });
     await publishTasks(env, recoveredTasks, scheduledAt);
   },

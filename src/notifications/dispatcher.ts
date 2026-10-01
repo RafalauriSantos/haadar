@@ -1,4 +1,5 @@
 import { formatTelegramAlert, type TelegramAlertCard, type TelegramClient } from "./telegram";
+import { reconcileConfirmedDeliveries } from "./reconcile";
 
 interface DeliveryRow {
   intent_key: string;
@@ -13,6 +14,7 @@ export async function dispatchOne(
 ): Promise<"none" | "sent" | "retryable" | "failed" | "unknown"> {
   const nowIso = now.toISOString();
   const lease = crypto.randomUUID();
+  await reconcileConfirmedDeliveries(db, now);
   await db.prepare(
     `UPDATE notification_deliveries
      SET state = 'unknown', last_error_kind = 'delivery_lease_expired',
