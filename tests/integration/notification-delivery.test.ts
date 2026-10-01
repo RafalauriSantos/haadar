@@ -71,9 +71,14 @@ describe("recoverable notification dispatch", () => {
       .toMatchObject({ state: "unknown", last_error_kind: "delivery_lease_expired" });
   });
 
-  it("formats a bounded plain-text card", () => {
+  it("formats a compact card with source and Haadar identity", () => {
     const card = formatTelegramAlert({ title: "*Backend*\nDeveloper", organization: "Acme", location: "Remote", source: "Greenhouse", url: "https://jobs.example/1", stage: "provisional" });
-    expect(card).toContain("Sinal inicial");
+    expect(card).toContain("🔔 Nova vaga — sinal inicial");
+    expect(card).toContain("💼 *Backend* Developer");
+    expect(card).toContain("🏢 Empresa: Acme");
+    expect(card).toContain("📍 Local: Remote");
+    expect(card).toContain("🔎 Fonte: Greenhouse");
+    expect(card).toContain("🤖 Enviado por Haadar");
     expect(card).not.toContain("\nDeveloper");
     expect(card.length).toBeLessThanOrEqual(4096);
   });

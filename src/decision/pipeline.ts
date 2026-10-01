@@ -70,6 +70,7 @@ export async function evaluateAndPersist(
       title: input.observation.title,
       organization: input.observation.organization ?? null,
       location: input.observation.location ?? null,
+      source: input.observation.sourceId,
       canonicalUrl: input.observation.canonicalUrl,
       stage: "final",
       outcome: decision.outcome,

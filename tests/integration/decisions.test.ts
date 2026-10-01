@@ -43,10 +43,11 @@ describe("persisted decisions and early intents", () => {
     });
     expect(result.outcome).toBe("alert");
     const intent = await env.DB.prepare(
-      "SELECT stage, status, early_signal_key FROM alert_intents WHERE vacancy_id = ?",
-    ).bind(vacancyId).first<{ stage: string; status: string; early_signal_key: string }>();
+      "SELECT stage, status, early_signal_key, payload_json FROM alert_intents WHERE vacancy_id = ?",
+    ).bind(vacancyId).first<{ stage: string; status: string; early_signal_key: string; payload_json: string }>();
     expect(intent).toMatchObject({ stage: "final", status: "pending" });
     expect(intent?.early_signal_key).toBeTruthy();
+    expect(JSON.parse(intent!.payload_json)).toMatchObject({ source: "greenhouse:test" });
   });
 
   it("persists exclusion evidence without creating an alert intent", async () => {

@@ -16,10 +16,16 @@ function bounded(value: string | null | undefined, limit: number): string {
   return (value ?? "não informado").replace(/[\r\n]+/g, " ").trim().slice(0, limit);
 }
 
+function sourceLabel(source: string | null | undefined): string {
+  if (source?.startsWith("greenhouse:")) return "Greenhouse";
+  return bounded(source, 120);
+}
+
 export function formatTelegramAlert(card: TelegramAlertCard): string {
-  const stage = card.stage === "provisional" ? "Sinal inicial" : "Decisão final";
-  const text = [stage, bounded(card.title, 500), `Empresa: ${bounded(card.organization, 250)}`,
-    `Local: ${bounded(card.location, 250)}`, `Fonte: ${bounded(card.source, 120)}`, card.url.slice(0, 1_500)].join("\n");
+  const heading = card.stage === "provisional" ? "🔔 Nova vaga — sinal inicial" : "🔔 Nova vaga encontrada";
+  const text = [heading, `💼 ${bounded(card.title, 500)}`, `🏢 Empresa: ${bounded(card.organization, 250)}`,
+    `📍 Local: ${bounded(card.location, 250)}`, `🔎 Fonte: ${sourceLabel(card.source)}`, `🔗 ${card.url.slice(0, 1_500)}`,
+    "🤖 Enviado por Haadar"].join("\n");
   return text.slice(0, 4_096);
 }
 
