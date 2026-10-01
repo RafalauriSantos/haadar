@@ -110,6 +110,33 @@ describe("persistent queue lifecycle", () => {
     expect(parseMessage({ ...task, deliveryMode: "loud" })).toEqual({ ok: false, reason: "invalid_schema" });
   });
 
+  it("makes the protected manual endpoint silent unless notification is explicitly requested", async () => {
+    const published: Array<{ body: { deliveryMode?: string } }> = [];
+    const queue = { async sendBatch(items: Array<{ body: { deliveryMode?: string } }>) { published.push(...items); } };
+    const ctx = createExecutionContext();
+    const silent = await worker.fetch(
+      new Request("https://haadar.test/admin/discovery?scheduledAt=2026-10-04T06:00:00.000Z", {
+        method: "POST", headers: { authorization: "Bearer test-admin-token" },
+      }),
+      { DB: env.DB, HAADAR_DISCOVERY: queue, ADMIN_TRIGGER_TOKEN: "test-admin-token" } as never,
+      ctx,
+    );
+    expect(silent.status).toBe(202);
+    expect(await silent.json()).toMatchObject({ deliveryMode: "silent" });
+    expect(published.length).toBeGreaterThan(0);
+    expect(published.every((item) => item.body.deliveryMode === "silent")).toBe(true);
+
+    const live = await worker.fetch(
+      new Request("https://haadar.test/admin/discovery?scheduledAt=2026-10-04T07:00:00.000Z&notify=true", {
+        method: "POST", headers: { authorization: "Bearer test-admin-token" },
+      }),
+      { DB: env.DB, HAADAR_DISCOVERY: queue, ADMIN_TRIGGER_TOKEN: "test-admin-token" } as never,
+      createExecutionContext(),
+    );
+    expect(await live.json()).toMatchObject({ deliveryMode: "live" });
+    expect(published.some((item) => item.body.deliveryMode === "live")).toBe(true);
+  });
+
   it.each(["permanent", "blocked", "schema_changed"] as const)("treats %s as terminal", async (kind) => {
     const minute = kind === "permanent" ? "03:00" : kind === "blocked" ? "04:30" : "06:00";
     const task = await createTask(`2026-10-03T${minute}:00.000Z`, "test");
