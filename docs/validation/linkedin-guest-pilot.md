@@ -29,6 +29,14 @@ Activation was explicitly approved on 2026-10-01. Task diagnostics, real observa
 - Deployment completed at 2026-10-01T10:08:50Z with the existing hourly schedule unchanged.
 - No manual discovery or test alert was sent. The first evidence must come from a normal hourly round after this deployment.
 
+## Controlled manual run — 2026-10-01
+
+- Manual round: `736ae1e25e35cc1523c147946dce43c4fe63941b93a320a357fa932152ef70f4` with its own `manual:` slot; it did not consume the scheduled hourly slot.
+- All 18 active sources were admitted. The three LinkedIn searches completed and persisted real observations: Java (9), Node (3), and Full Stack (5).
+- The normal 08:00 BRT cron subsequently created its own independent 18-task round (`2026-10-01T11:00:00.000Z`).
+- The manual round generated 24 sent alert intents and 2 pending intents through the normal notification flow.
+- The Google News feeds exposed two adapter defects during this run: missing transparent request identity and GUID parsing that rejected attribute-bearing elements. Both fixes were tested and deployed in `ea3330e` and `8a58e46`; their next live validation is the following normal hourly round.
+
 ## Removal decision
 
 If three consecutive active hourly rounds have a `blocked` or `schema_changed` LinkedIn diagnostic, remove all three guest-source definitions in a separate corrective commit and review the experiment. No retry strategy, alternate host, session state or identity-avoidance measure is permitted.
