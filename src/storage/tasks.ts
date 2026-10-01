@@ -76,6 +76,64 @@ export async function reconcileExpiredTaskLeases(db: D1Database, now: string): P
   return result.meta.changes;
 }
 
+export async function recoverExpiredTaskPublications(
+  db: D1Database,
+  input: { now: Date; leaseMs: number; limit?: number },
+): Promise<DiscoveryTask[]> {
+  const now = input.now.toISOString();
+  const expired = await db.prepare(
+    `UPDATE discovery_tasks
+     SET status = 'retryable', lease_token = NULL, lease_expires_at = NULL,
+         last_error_kind = 'lease_expired', updated_at = ?
+     WHERE id IN (
+       SELECT id FROM discovery_tasks
+       WHERE status = 'running' AND lease_expires_at <= ?
+       ORDER BY lease_expires_at LIMIT ?
+     )
+     RETURNING id`,
+  ).bind(now, now, input.limit ?? 20).all<{ id: string }>();
+  if (expired.results.length === 0) return [];
+
+  const ids = expired.results.map((row) => row.id);
+  const placeholders = ids.map(() => "?").join(",");
+  await db.prepare(
+    `UPDATE task_publications
+     SET status = 'pending', lease_token = NULL, lease_expires_at = NULL, updated_at = ?
+     WHERE task_id IN (${placeholders})`,
+  ).bind(now, ...ids).run();
+
+  const leaseToken = crypto.randomUUID();
+  const leased = await db.prepare(
+    `UPDATE task_publications
+     SET status = 'leased', lease_token = ?, lease_expires_at = ?,
+         publish_attempts = publish_attempts + 1, updated_at = ?
+     WHERE task_id IN (${placeholders}) AND status = 'pending'
+     RETURNING task_id`,
+  ).bind(leaseToken, new Date(input.now.getTime() + input.leaseMs).toISOString(), now, ...ids)
+    .all<{ task_id: string }>();
+  if (leased.results.length === 0) return [];
+
+  const leasedIds = leased.results.map((row) => row.task_id);
+  const leasedPlaceholders = leasedIds.map(() => "?").join(",");
+  const tasks = await db.prepare(
+    `SELECT id, round_id, query_id, adapter_id, idempotency_key, attempt, delivery_mode
+     FROM discovery_tasks WHERE id IN (${leasedPlaceholders}) ORDER BY id`,
+  ).bind(...leasedIds).all<{
+    id: string; round_id: string; query_id: string; adapter_id: string;
+    idempotency_key: string; attempt: number; delivery_mode: "live" | "silent";
+  }>();
+  return tasks.results.map((task) => ({
+    id: task.id,
+    roundId: task.round_id,
+    queryId: task.query_id,
+    adapterId: task.adapter_id,
+    idempotencyKey: task.idempotency_key,
+    attempt: task.attempt,
+    deliveryMode: task.delivery_mode,
+    publicationLeaseToken: leaseToken,
+  }));
+}
+
 async function reconcileRoundForTask(db: D1Database, taskId: string, now: string): Promise<void> {
   await db.prepare(
     `UPDATE discovery_rounds

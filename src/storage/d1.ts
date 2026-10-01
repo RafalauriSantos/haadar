@@ -97,8 +97,8 @@ export async function persistRoundPlan(
       db.prepare(
         `INSERT INTO discovery_tasks
           (id, round_id, query_id, adapter_id, idempotency_key, attempt, status,
-           created_at, updated_at, portfolio_snapshot_hash)
-         SELECT ?, ps.round_id, ?, ?, ?, ?, 'pending', ?, ?, ps.snapshot_hash
+           created_at, updated_at, portfolio_snapshot_hash, delivery_mode)
+         SELECT ?, ps.round_id, ?, ?, ?, ?, 'pending', ?, ?, ps.snapshot_hash, ?
          FROM portfolio_snapshots ps
          WHERE ps.round_id = ? AND ps.snapshot_hash = ?
          ON CONFLICT(idempotency_key) DO NOTHING`,
@@ -110,6 +110,7 @@ export async function persistRoundPlan(
         task.attempt,
         input.now,
         input.now,
+        task.deliveryMode ?? "live",
         task.roundId,
         input.snapshotHash,
       ),
@@ -118,6 +119,9 @@ export async function persistRoundPlan(
          SELECT id, 'pending', ?, ? FROM discovery_tasks WHERE id = ?
          ON CONFLICT(task_id) DO NOTHING`,
       ).bind(input.now, input.now, task.id),
+      db.prepare(
+        "UPDATE discovery_tasks SET delivery_mode = ? WHERE id = ?",
+      ).bind(task.deliveryMode ?? "live", task.id),
     );
   }
 
@@ -157,7 +161,7 @@ export async function claimTaskPublications(
 
   const placeholders = claimed.results.map(() => "?").join(",");
   const tasks = await db.prepare(
-    `SELECT id, round_id, query_id, adapter_id, idempotency_key, attempt
+    `SELECT id, round_id, query_id, adapter_id, idempotency_key, attempt, delivery_mode
      FROM discovery_tasks WHERE id IN (${placeholders}) ORDER BY id`,
   ).bind(...claimed.results.map((row) => row.task_id)).all<{
     id: string;
@@ -166,6 +170,7 @@ export async function claimTaskPublications(
     adapter_id: string;
     idempotency_key: string;
     attempt: number;
+    delivery_mode: "live" | "silent";
   }>();
   return tasks.results.map((task) => ({
     id: task.id,
@@ -174,6 +179,7 @@ export async function claimTaskPublications(
     adapterId: task.adapter_id,
     idempotencyKey: task.idempotency_key,
     attempt: task.attempt,
+    deliveryMode: task.delivery_mode,
     publicationLeaseToken: input.leaseToken,
   }));
 }

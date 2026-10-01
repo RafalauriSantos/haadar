@@ -3,6 +3,7 @@ import { createExecutionContext, createMessageBatch, getQueueResult } from "clou
 import { describe, expect, it } from "vitest";
 import type { SourceAdapter } from "../../src/adapters/adapter";
 import { admitRound } from "../../src/discovery/round-coordinator";
+import { markTaskPublished } from "../../src/storage/d1";
 import worker, { createAdapters } from "../../src/index";
 import { consumeMessage, retryDelay } from "../../src/queue/consumer";
 import { linkedinGuestSources } from "../../src/portfolio/sources";
@@ -135,6 +136,26 @@ describe("persistent queue lifecycle", () => {
     );
     expect(await live.json()).toMatchObject({ deliveryMode: "live" });
     expect(published.some((item) => item.body.deliveryMode === "live")).toBe(true);
+  });
+
+  it("republishes an expired task on the next scheduled run without changing its silent mode", async () => {
+    const task = await createTask("2026-10-04T07:00:00.000Z", "test");
+    await env.DB.prepare("UPDATE discovery_tasks SET delivery_mode = 'silent', status = 'running', lease_expires_at = ? WHERE id = ?")
+      .bind("2026-10-04T07:04:00.000Z", task.id).run();
+    await markTaskPublished(env.DB, task.id, task.publicationLeaseToken!);
+    const before = await env.DB.prepare("SELECT COUNT(*) AS count FROM discovery_rounds").first<{ count: number }>();
+
+    const published: Array<{ body: { id: string; deliveryMode?: string } }> = [];
+    const queue = { async sendBatch(items: Array<{ body: { id: string; deliveryMode?: string } }>) { published.push(...items); } };
+    await worker.scheduled(
+      { scheduledTime: Date.parse("2026-10-04T08:10:00.000Z"), cron: "*/5 * * * *", noRetry() {} } as ScheduledController,
+      { DB: env.DB, HAADAR_DISCOVERY: queue } as never,
+      createExecutionContext(),
+    );
+
+    expect(published).toContainEqual(expect.objectContaining({ body: expect.objectContaining({ id: task.id, deliveryMode: "silent" }) }));
+    const after = await env.DB.prepare("SELECT COUNT(*) AS count FROM discovery_rounds").first<{ count: number }>();
+    expect(after?.count).toBe(before?.count);
   });
 
   it.each(["permanent", "blocked", "schema_changed"] as const)("treats %s as terminal", async (kind) => {

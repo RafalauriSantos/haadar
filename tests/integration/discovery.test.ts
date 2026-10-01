@@ -3,6 +3,7 @@ import { applyD1Migrations } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { admitRound } from "../../src/discovery/round-coordinator";
 import { markTaskPublished, persistCanonicalObservation } from "../../src/storage/d1";
+import { recoverExpiredTaskPublications } from "../../src/storage/tasks";
 
 const usage = {
   workersRequests: 0,
@@ -140,6 +141,38 @@ describe("reliable discovery identity", () => {
       publicationStaleMs: 1_000,
     });
     expect(afterQueueStaleness.tasks).toHaveLength(1);
+  });
+
+  it("releases an expired running task back to the queue with its original silent delivery mode", async () => {
+    const admission = await admitRound({
+      db: env.DB,
+      scheduledAt: new Date("2026-10-01T06:30:00.000Z"),
+      portfolio: { ...portfolio, revision: "recovery-v1", queries: portfolio.queries.slice(0, 1) },
+      usage,
+      adapterIds: ["fixture"],
+      deliveryMode: "silent",
+      now: new Date("2026-10-01T06:30:01.000Z"),
+    });
+    const task = admission.tasks[0];
+    expect(task.deliveryMode).toBe("silent");
+    expect(await env.DB.prepare("SELECT delivery_mode FROM discovery_tasks WHERE id = ?")
+      .bind(task.id).first()).toMatchObject({ delivery_mode: "silent" });
+    await markTaskPublished(env.DB, task.id, task.publicationLeaseToken!, "2026-10-01T06:30:02.000Z");
+    await env.DB.prepare(
+      `UPDATE discovery_tasks
+       SET status = 'running', lease_token = 'expired', lease_expires_at = '2026-10-01T06:30:03.000Z'
+       WHERE id = ?`,
+    ).bind(task.id).run();
+
+    const recovered = await recoverExpiredTaskPublications(env.DB, {
+      now: new Date("2026-10-01T06:35:00.000Z"),
+      leaseMs: 60_000,
+    });
+
+    expect(recovered).toHaveLength(1);
+    expect(recovered[0]).toMatchObject({ id: task.id, deliveryMode: "silent" });
+    expect(recovered[0].publicationLeaseToken).toBeTruthy();
+    expect(await markTaskPublished(env.DB, recovered[0].id, recovered[0].publicationLeaseToken!, "2026-10-01T06:35:01.000Z")).toBe(true);
   });
 
   it("keeps one vacancy with multiple query occurrences and changing URLs", async () => {

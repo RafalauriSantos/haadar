@@ -11,7 +11,7 @@ import { parseMessage } from "./queue/messages";
 import { admitRound } from "./discovery/round-coordinator";
 import { markTaskPublished } from "./storage/d1";
 import { pausedSourceIds } from "./storage/source-health";
-import { reconcileExpiredTaskLeases } from "./storage/tasks";
+import { recoverExpiredTaskPublications } from "./storage/tasks";
 import { recordUsage } from "./observability/usage-ledger";
 import { utcDay } from "./budget/reservations";
 import { getOperationalHealth } from "./observability/health";
@@ -51,6 +51,27 @@ export function createAdapters(sources: SourceDefinition[], fetcher?: typeof fet
   ]));
 }
 
+async function publishTasks(
+  env: Env,
+  tasks: DiscoveryTaskMessage[],
+  scheduledAt: Date,
+  fallbackDeliveryMode: "live" | "silent" = "live",
+): Promise<void> {
+  if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for task publication");
+  if (tasks.length === 0) return;
+  const sourcesById = new Map(pilotSources.map((source) => [source.id, source]));
+  await env.HAADAR_DISCOVERY.sendBatch(tasks.map((task) => ({
+    body: { ...task, deliveryMode: task.deliveryMode ?? fallbackDeliveryMode },
+    delaySeconds: sourcesById.get(task.adapterId)?.dispatchDelaySeconds,
+  })));
+  await Promise.all(tasks.map(async (task) => {
+    if (!task.publicationLeaseToken) throw new Error("publication lease token is required");
+    const marked = await markTaskPublished(env.DB!, task.id, task.publicationLeaseToken);
+    if (!marked) throw new Error(`publication lease lost for task ${task.id}`);
+    await recordUsage(env.DB!, `task:${task.id}:queue-publish`, utcDay(scheduledAt), "queue_operations", 1);
+  }));
+}
+
 async function runDiscoveryRound(
   env: Env,
   scheduledAt: Date,
@@ -58,7 +79,10 @@ async function runDiscoveryRound(
   deliveryMode: "live" | "silent" = "live",
 ): Promise<{ roundId: string; admittedTasks: number; deliveryMode: "live" | "silent" }> {
   if (!env.DB || !env.HAADAR_DISCOVERY) throw new Error("D1 and Queue bindings are required for scheduled discovery");
-  await reconcileExpiredTaskLeases(env.DB, scheduledAt.toISOString());
+  const recoveredTasks = await recoverExpiredTaskPublications(env.DB, {
+    now: scheduledAt,
+    leaseMs: 5 * 60_000,
+  });
   const paused = await pausedSourceIds(env.DB, scheduledAt);
   const activeSources = pilotSources.filter((source) => source.active && !paused.has(source.id));
   const admission = await admitRound({
@@ -68,20 +92,10 @@ async function runDiscoveryRound(
     portfolio: { revision: "portfolio-v2-greenhouse-pilot", queries: initialQueries },
     adapterIds: activeSources.map((source) => source.id),
     boardOnceAdapters: true,
+    deliveryMode,
   });
-  if (admission.tasks.length > 0) {
-    const sourcesById = new Map(activeSources.map((source) => [source.id, source]));
-    await env.HAADAR_DISCOVERY.sendBatch(admission.tasks.map((task) => ({
-      body: { ...task, deliveryMode },
-      delaySeconds: sourcesById.get(task.adapterId)?.dispatchDelaySeconds,
-    })));
-    await Promise.all(admission.tasks.map(async (task) => {
-      if (!task.publicationLeaseToken) throw new Error("publication lease token is required");
-      const marked = await markTaskPublished(env.DB!, task.id, task.publicationLeaseToken);
-      if (!marked) throw new Error(`publication lease lost for task ${task.id}`);
-      await recordUsage(env.DB!, `task:${task.id}:queue-publish`, utcDay(scheduledAt), "queue_operations", 1);
-    }));
-  }
+  const tasksToPublish = [...recoveredTasks, ...admission.tasks];
+  await publishTasks(env, tasksToPublish, scheduledAt, deliveryMode);
   return { roundId: admission.round.id, admittedTasks: admission.tasks.length, deliveryMode };
 }
 
@@ -143,7 +157,14 @@ const worker = {
   },
 
   async scheduled(controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    await runDiscoveryRound(env, new Date(controller.scheduledTime));
+    const scheduledAt = new Date(controller.scheduledTime);
+    if (scheduledAt.getUTCMinutes() === 0) {
+      await runDiscoveryRound(env, scheduledAt);
+      return;
+    }
+    if (!env.DB) throw new Error("D1 binding is required for scheduled maintenance");
+    const recoveredTasks = await recoverExpiredTaskPublications(env.DB, { now: scheduledAt, leaseMs: 5 * 60_000 });
+    await publishTasks(env, recoveredTasks, scheduledAt);
   },
 
   async queue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
