@@ -31,7 +31,7 @@ describe("persisted decisions and early intents", () => {
   it("alerts for a profile role found outside the title without requiring a stack title", async () => {
     const { observation, vacancyId } = await persist({
       id: "profile-description",
-      title: "Product Engineer",
+      title: "Junior Product Engineer",
       description: "Work on backend services using Java and PostgreSQL.",
     });
     const result = await evaluateAndPersist(env.DB, {
@@ -68,7 +68,7 @@ describe("persisted decisions and early intents", () => {
   });
 
   it("keeps one intent across query attribution and preserves both decisions", async () => {
-    const { observation, vacancyId } = await persist({ id: "cross-query", title: "Backend Software Developer" });
+    const { observation, vacancyId } = await persist({ id: "cross-query", title: "Junior Backend Software Developer" });
     for (const queryId of ["role-backend", "broad-software"]) {
       await evaluateAndPersist(env.DB, {
         vacancyId,

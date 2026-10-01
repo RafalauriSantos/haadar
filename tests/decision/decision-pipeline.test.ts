@@ -6,7 +6,7 @@ import { finalDecision } from "../../src/decision/final-decision";
 import type { NormalizedObservation, QueryDefinition } from "../../src/domain/types";
 
 const query: QueryDefinition = { id: "role-1", revision: "1", family: "ROLE", terms: ["backend", "typescript"], exclusions: ["senior"], priority: 10, estimatedCost: 1, active: true };
-const observation: NormalizedObservation = { sourceId: "fixture", canonicalUrl: "https://jobs.example/1", title: "Backend TypeScript Developer", observedAt: "2026-09-30T01:30:00.000Z", queryId: query.id, fingerprint: "fp-1" };
+const observation: NormalizedObservation = { sourceId: "fixture", canonicalUrl: "https://jobs.example/1", title: "Junior Backend TypeScript Developer", observedAt: "2026-09-30T01:30:00.000Z", queryId: query.id, fingerprint: "fp-1" };
 
 describe("decision pipeline", () => {
   it("follows gate, provisional Early Signal, heuristic score, and Final Decision", async () => {
@@ -27,6 +27,18 @@ describe("decision pipeline", () => {
     const gate = deterministicGate(excluded, query);
     expect(gate.eligible).toBe(false);
     expect(await earlySignal(excluded, gate)).toBeNull();
+  });
+
+  it("requires an explicit entry-level signal before creating an alert", async () => {
+    const unknownLevel = { ...observation, title: "Backend TypeScript Developer" };
+    const gate = deterministicGate(unknownLevel, query);
+    expect(gate).toMatchObject({ eligible: false, reasonCode: "seniority_not_explicit" });
+    expect(await earlySignal(unknownLevel, gate)).toBeNull();
+  });
+
+  it("accepts common entry-level title equivalents", () => {
+    expect(deterministicGate({ ...observation, title: "Software Engineer I" }, query).eligible).toBe(true);
+    expect(deterministicGate({ ...observation, title: "Associate Backend Developer" }, query).eligible).toBe(true);
   });
 
   it("keeps finalization idempotent through the same early-signal key", async () => {
