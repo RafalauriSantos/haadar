@@ -212,6 +212,9 @@ describe("persistent queue lifecycle", () => {
     expect(await env.DB.prepare("SELECT terminal_reason, last_error_kind FROM discovery_tasks WHERE id = ?")
       .bind(task.id).first<{ terminal_reason: string; last_error_kind: string | null }>())
       .toMatchObject({ terminal_reason: kind, last_error_kind: kind });
+    if (kind === "permanent") {
+      expect((await getSourceHealth(env.DB, adapterId))?.pausedUntil).not.toBeNull();
+    }
   });
 
   it("acknowledges invalid messages and retries a valid failing message independently", async () => {

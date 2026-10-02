@@ -45,10 +45,10 @@ export async function recordSourceTerminalFailure(
   failureKind: string,
   now: Date,
 ): Promise<SourceHealth> {
-  const immediatePause = failureKind === "throttled" || failureKind === "blocked" || failureKind === "schema_changed";
+  const immediatePause = failureKind === "throttled" || failureKind === "blocked" || failureKind === "schema_changed" || failureKind === "permanent";
   const pauseMs = failureKind === "throttled"
     ? THROTTLE_PAUSE_MS
-    : failureKind === "blocked" || failureKind === "schema_changed"
+    : failureKind === "blocked" || failureKind === "schema_changed" || failureKind === "permanent"
       ? CONTRACT_PAUSE_MS
       : PAUSE_MS;
   const pauseCandidate = new Date(now.getTime() + pauseMs).toISOString();
