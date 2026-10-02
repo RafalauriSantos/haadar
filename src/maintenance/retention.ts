@@ -8,6 +8,7 @@ export interface RetentionResult {
   dryRun: boolean;
   operationalEvents: number;
   observations: number;
+  sourceCanarySamples: number;
 }
 
 function validatePolicy(policy: RetentionPolicy): void {
@@ -28,6 +29,9 @@ export async function runRetention(
   const eventIds = await db.prepare(
     "SELECT id FROM operational_events WHERE created_at < ? ORDER BY id LIMIT ?",
   ).bind(eventCutoff, policy.batchSize).all<{ id: number }>();
+  const canaryTaskIds = await db.prepare(
+    "SELECT task_id FROM source_canary_samples WHERE observed_at < ? ORDER BY observed_at, task_id LIMIT ?",
+  ).bind(eventCutoff, policy.batchSize).all<{ task_id: string }>();
   const observationIds = await db.prepare(
     `SELECT o.id FROM observations o
      WHERE o.observed_at < ? AND o.origin_kind = 'synthetic'
@@ -39,7 +43,10 @@ export async function runRetention(
        )
      ORDER BY o.id LIMIT ?`,
   ).bind(observationCutoff, policy.batchSize).all<{ id: number }>();
-  if (options.dryRun) return { dryRun: true, operationalEvents: eventIds.results.length, observations: observationIds.results.length };
+  if (options.dryRun) return {
+    dryRun: true, operationalEvents: eventIds.results.length, observations: observationIds.results.length,
+    sourceCanarySamples: canaryTaskIds.results.length,
+  };
   if (eventIds.results.length > 0) {
     await db.prepare(`DELETE FROM operational_events WHERE id IN (${eventIds.results.map(() => "?").join(",")})`)
       .bind(...eventIds.results.map((row) => row.id)).run();
@@ -48,5 +55,12 @@ export async function runRetention(
     await db.prepare(`DELETE FROM observations WHERE id IN (${observationIds.results.map(() => "?").join(",")})`)
       .bind(...observationIds.results.map((row) => row.id)).run();
   }
-  return { dryRun: false, operationalEvents: eventIds.results.length, observations: observationIds.results.length };
+  if (canaryTaskIds.results.length > 0) {
+    await db.prepare(`DELETE FROM source_canary_samples WHERE task_id IN (${canaryTaskIds.results.map(() => "?").join(",")})`)
+      .bind(...canaryTaskIds.results.map((row) => row.task_id)).run();
+  }
+  return {
+    dryRun: false, operationalEvents: eventIds.results.length, observations: observationIds.results.length,
+    sourceCanarySamples: canaryTaskIds.results.length,
+  };
 }

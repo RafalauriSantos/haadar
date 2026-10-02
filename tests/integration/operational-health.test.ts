@@ -66,10 +66,40 @@ describe("operational health and retention", () => {
     ).bind(protectedObservation!.id).run();
 
     const policy = { operationalEventsDays: 7, obsoleteObservationsDays: 7, batchSize: 10 };
-    await expect(runRetention(env.DB, policy, { now, dryRun: true })).resolves.toEqual({ dryRun: true, operationalEvents: 1, observations: 1 });
-    await expect(runRetention(env.DB, policy, { now })).resolves.toEqual({ dryRun: false, operationalEvents: 1, observations: 1 });
+    await expect(runRetention(env.DB, policy, { now, dryRun: true })).resolves.toEqual({ dryRun: true, operationalEvents: 1, observations: 1, sourceCanarySamples: 0 });
+    await expect(runRetention(env.DB, policy, { now })).resolves.toEqual({ dryRun: false, operationalEvents: 1, observations: 1, sourceCanarySamples: 0 });
     expect(await env.DB.prepare("SELECT id FROM observations WHERE canonical_url = ?").bind("https://example.test/discardable").first()).toBeNull();
     expect(await env.DB.prepare("SELECT id FROM observations WHERE canonical_url = ?").bind("https://example.test/protected").first()).not.toBeNull();
+  });
+
+  it("dry-runs and deletes expired canary samples in bounded batches using event retention", async () => {
+    const cutoff = "2026-09-29T12:00:00.000Z";
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO source_canary_samples (source_key, task_id, round_id, observed_count, observed_at)
+         VALUES ('retention-source', 'canary-expired-1', 'retention-round', 10, '2026-01-01T00:00:00.000Z')`,
+      ),
+      env.DB.prepare(
+        `INSERT INTO source_canary_samples (source_key, task_id, round_id, observed_count, observed_at)
+         VALUES ('retention-source', 'canary-expired-2', 'retention-round', 20, '2026-01-02T00:00:00.000Z')`,
+      ),
+      env.DB.prepare(
+        `INSERT INTO source_canary_samples (source_key, task_id, round_id, observed_count, observed_at)
+         VALUES ('retention-source', 'canary-at-cutoff', 'retention-round', 30, ?)`,
+      ).bind(cutoff),
+      env.DB.prepare(
+        `INSERT INTO source_canary_samples (source_key, task_id, round_id, observed_count, observed_at)
+         VALUES ('retention-source', 'canary-recent', 'retention-round', 40, ?)`,
+      ).bind(now.toISOString()),
+    ]);
+    const policy = { operationalEventsDays: 7, obsoleteObservationsDays: 1, batchSize: 1 };
+    expect(await runRetention(env.DB, policy, { now, dryRun: true })).toMatchObject({ dryRun: true, sourceCanarySamples: 1 });
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM source_canary_samples").first()).toEqual({ count: 4 });
+    expect(await runRetention(env.DB, policy, { now })).toMatchObject({ sourceCanarySamples: 1 });
+    expect(await env.DB.prepare("SELECT task_id FROM source_canary_samples ORDER BY task_id").all())
+      .toMatchObject({ results: [{ task_id: "canary-at-cutoff" }, { task_id: "canary-expired-2" }, { task_id: "canary-recent" }] });
+    expect(await runRetention(env.DB, policy, { now })).toMatchObject({ sourceCanarySamples: 1 });
+    expect(await runRetention(env.DB, policy, { now })).toMatchObject({ sourceCanarySamples: 0 });
   });
 
   it("keeps synthetic fixtures out of discovery metrics", async () => {
