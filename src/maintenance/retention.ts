@@ -56,12 +56,15 @@ export async function runRetention(
       .bind(...observationIds.results.map((row) => row.id)).run();
   }
   let deletedCanarySamples = 0;
-  if (canaryTaskIds.results.length > 0) {
+  // D1 allows 100 bound parameters; reserve one for the expiration recheck.
+  const canaryDeleteChunkSize = 99;
+  for (let offset = 0; offset < canaryTaskIds.results.length; offset += canaryDeleteChunkSize) {
+    const chunk = canaryTaskIds.results.slice(offset, offset + canaryDeleteChunkSize);
     const deleted = await db.prepare(
       `DELETE FROM source_canary_samples WHERE observed_at < ?
-       AND task_id IN (${canaryTaskIds.results.map(() => "?").join(",")})`,
-    ).bind(eventCutoff, ...canaryTaskIds.results.map((row) => row.task_id)).run();
-    deletedCanarySamples = deleted.meta.changes;
+       AND task_id IN (${chunk.map(() => "?").join(",")})`,
+    ).bind(eventCutoff, ...chunk.map((row) => row.task_id)).run();
+    deletedCanarySamples += deleted.meta.changes;
   }
   return {
     dryRun: false, operationalEvents: eventIds.results.length, observations: observationIds.results.length,

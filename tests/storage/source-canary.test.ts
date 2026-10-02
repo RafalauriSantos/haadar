@@ -124,4 +124,16 @@ describe("persisted source canary", () => {
       .bind("expired-task").first()).toBeNull();
     expect(result.sourceCanarySamples).toBe(1);
   });
+
+  it("deletes 100 expired samples at batchSize 100 without exceeding D1's parameter limit", async () => {
+    await env.DB.batch(Array.from({ length: 100 }, (_, index) => env.DB.prepare(
+      `INSERT INTO source_canary_samples (task_id, source_key, round_id, observed_count, observed_at)
+       VALUES (?, 'retention-source', 'retention-round', 10, '2026-01-01T00:00:00.000Z')`,
+    ).bind(`expired-task-${index}`)));
+
+    const result = await runRetention(env.DB,
+      { operationalEventsDays: 7, obsoleteObservationsDays: 7, batchSize: 100 }, { now });
+    expect(result.sourceCanarySamples).toBe(100);
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM source_canary_samples").first()).toEqual({ count: 0 });
+  });
 });
