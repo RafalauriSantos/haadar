@@ -9,7 +9,7 @@ import { initialQueries } from "../portfolio/query-portfolio";
 import { defaultRelevanceProfile } from "../portfolio/sources";
 import type { EnrichmentWorkflowParams } from "../workflows/enrichment";
 import { getSourceHealth, recordSourceSuccess, recordSourceTerminalFailure } from "../storage/source-health";
-import { recordSourceCanary } from "../storage/source-canary";
+import { recordSourceCanarySnapshot } from "../storage/source-canary";
 import { defaultSourceCanaryPolicy, type SourceCanaryPolicy } from "../portfolio/source-contract";
 
 export type ConsumeAction =
@@ -168,28 +168,15 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
     }
 
     try {
-      const canary = await recordSourceCanary(input.db, {
+      await recordSourceCanarySnapshot(input.db, {
         sourceKey: sourceHealthKey,
         taskId: input.task.id,
         roundId: input.task.roundId,
         observedCount: adapterResult.observations.length,
         policy: input.canaryPolicy ?? defaultSourceCanaryPolicy,
-        now,
-      });
-      await recordOperationalEvent(input.db, {
-        eventKey: `task:${input.task.id}:canary`,
-        eventType: "source_canary",
-        roundId: input.task.roundId,
-        taskId: input.task.id,
         queryId: input.task.queryId,
         adapterId: input.task.adapterId,
-        payload: {
-          sourceKey: sourceHealthKey,
-          state: canary.state,
-          count: canary.observedCount,
-          baselineMedian: canary.baselineMedian,
-          sampleSize: canary.sampleSize,
-        },
+        now,
       });
     } catch {
       // Observability failures must never retry discovery or open a source circuit.

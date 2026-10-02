@@ -280,7 +280,8 @@ function safeOperationalPayload(payload: Record<string, unknown>): Record<string
   return safe;
 }
 
-export async function recordOperationalEvent(db: D1DatabaseLike, event: OperationalEvent): Promise<void> {
+/** Share the sanitized statement with transactional observability writers. */
+export function operationalEventWrite(event: OperationalEvent, now = new Date()): { query: string; values: unknown[] } {
   const conflict = event.eventType === "source_canary"
     ? `ON CONFLICT(event_key) DO UPDATE SET
          round_id = excluded.round_id, task_id = excluded.task_id,
@@ -288,21 +289,27 @@ export async function recordOperationalEvent(db: D1DatabaseLike, event: Operatio
          payload_json = excluded.payload_json, created_at = excluded.created_at
        WHERE operational_events.event_type = 'source_canary'`
     : "ON CONFLICT(event_key) DO NOTHING";
-  await db.prepare(
-    `INSERT INTO operational_events
+  return {
+    query: `INSERT INTO operational_events
       (event_key, event_type, round_id, task_id, query_id, adapter_id, payload_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ${conflict}`,
-  ).bind(
-    event.eventKey,
-    event.eventType,
-    event.roundId ?? null,
-    event.taskId ?? null,
-    event.queryId ?? null,
-    event.adapterId ?? null,
-    JSON.stringify(safeOperationalPayload(event.payload)),
-    new Date().toISOString(),
-  ).run();
+    values: [
+      event.eventKey,
+      event.eventType,
+      event.roundId ?? null,
+      event.taskId ?? null,
+      event.queryId ?? null,
+      event.adapterId ?? null,
+      JSON.stringify(safeOperationalPayload(event.payload)),
+      now.toISOString(),
+    ],
+  };
+}
+
+export async function recordOperationalEvent(db: D1DatabaseLike, event: OperationalEvent): Promise<void> {
+  const eventWrite = operationalEventWrite(event);
+  await db.prepare(eventWrite.query).bind(...eventWrite.values).run();
 }
 
 export async function persistCanonicalObservation(db: D1Database, observation: NormalizedObservation): Promise<string> {

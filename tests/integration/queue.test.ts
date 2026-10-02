@@ -188,9 +188,52 @@ describe("persistent queue lifecycle", () => {
       expect(calls).toBe(1);
       expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operational_events WHERE task_id = ? AND event_type IN ('task_retryable_failure', 'task_terminal', 'source_canary')")
         .bind(task.id).first()).toEqual({ count: 0 });
+      expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM source_canary_samples WHERE task_id = ?")
+        .bind(task.id).first()).toEqual({ count: 0 });
       expect(logger.mock.calls).toEqual([[JSON.stringify({ event: "source_canary_persistence_failed" })]]);
     } finally {
       await env.DB.prepare("DROP TRIGGER fail_canary_write").run();
+      logger.mockRestore();
+    }
+  });
+
+  it.each(["sample", "event"] as const)("rolls back both snapshot updates when the %s statement fails during recovery", async (stage) => {
+    const now = new Date("2026-10-03T15:00:00.000Z");
+    const task = await createTask(now.toISOString(), `atomic-recovery-${stage}`);
+    const sourceKey = `atomic-source-${stage}`;
+    const policy = { minimumBaselineSamples: 1, baselineWindow: 1, anomalyAtOrBelow: 0 };
+    await recordSourceCanary(env.DB, {
+      sourceKey, taskId: `atomic-baseline-${stage}`, roundId: "baseline-round", observedCount: 10,
+      policy, now: new Date(now.getTime() - 60_000),
+    });
+    const once = adapter();
+    let calls = 0;
+    const counting: SourceAdapter = { ...once, async discover(value) {
+      calls += 1;
+      const result = await once.discover(value);
+      return { ...result, observations: calls === 1 ? [] : result.observations };
+    } };
+    const input = { db: env.DB, task, adapters: { [task.adapterId]: counting }, maxAttempts: 4, sourceHealthKey: sourceKey, canaryPolicy: policy };
+    expect(await consumeMessage({ ...input, queueAttempts: 1, now })).toEqual({ action: "ack", outcome: "completed" });
+    const beforeSample = await env.DB.prepare("SELECT * FROM source_canary_samples WHERE task_id = ?").bind(task.id).first();
+    const beforeEvent = await env.DB.prepare("SELECT * FROM operational_events WHERE event_key = ?").bind(`task:${task.id}:canary`).first();
+    await env.DB.prepare("UPDATE discovery_tasks SET status = 'running', lease_token = 'expired', lease_expires_at = ? WHERE id = ?")
+      .bind(new Date(now.getTime() + 5 * 60_000).toISOString(), task.id).run();
+    const trigger = stage === "sample"
+      ? "CREATE TRIGGER fail_atomic_update BEFORE UPDATE ON source_canary_samples BEGIN SELECT RAISE(ABORT, 'private snapshot failure'); END"
+      : "CREATE TRIGGER fail_atomic_update BEFORE UPDATE ON operational_events WHEN NEW.event_type = 'source_canary' BEGIN SELECT RAISE(ABORT, 'private snapshot failure'); END";
+    await env.DB.prepare(trigger).run();
+    const logger = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(await consumeMessage({ ...input, queueAttempts: 2, now: new Date(now.getTime() + 6 * 60_000) }))
+        .toEqual({ action: "ack", outcome: "completed" });
+      expect(await env.DB.prepare("SELECT * FROM source_canary_samples WHERE task_id = ?").bind(task.id).first()).toEqual(beforeSample);
+      expect(await env.DB.prepare("SELECT * FROM operational_events WHERE event_key = ?").bind(`task:${task.id}:canary`).first()).toEqual(beforeEvent);
+      expect(await getSourceHealth(env.DB, sourceKey)).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
+      expect(await consumeMessage({ ...input, queueAttempts: 3 })).toEqual({ action: "ack", outcome: "already_terminal" });
+      expect(calls).toBe(2);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER fail_atomic_update").run();
       logger.mockRestore();
     }
   });
