@@ -3,6 +3,13 @@ import { defaultRelevanceProfile, githubIssuesSources, gupySources, linkedinGues
 import { initialQueries } from "../../src/portfolio/query-portfolio";
 
 describe("public source contracts", () => {
+  it("shares a low-cost canary policy across normal collection results", () => {
+    for (const source of pilotSources) {
+      expect(source.canaryPolicy).toEqual({ minimumBaselineSamples: 3, baselineWindow: 10, anomalyAtOrBelow: 0 });
+      expect(source.canaryPolicy).toBe(pilotSources[0].canaryPolicy);
+    }
+  });
+
   it("keeps every source bounded to one public board request", () => {
     expect(pilotSources).toHaveLength(18);
     expect(pilotSources[0]).toMatchObject({
