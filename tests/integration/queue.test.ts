@@ -18,6 +18,7 @@ async function createTask(slot: string, adapterId = "fixture") {
   const admission = await admitRound({
     db: env.DB,
     scheduledAt: new Date(slot),
+    roundSlot: `queue:${slot}:${adapterId}`,
     portfolio: {
       revision: `queue-${slot}-${adapterId}`,
       queries: [{ id: "query-1", revision: "1", family: "ROLE", terms: ["backend"], exclusions: [], priority: 1, estimatedCost: 1, active: true }],
@@ -101,7 +102,8 @@ describe("persistent queue lifecycle", () => {
     "does not record a canary for a %s diagnostic", async (kind) => {
       const minute = ["permanent", "blocked", "schema_changed", "retryable", "throttled"].indexOf(kind) * 10;
       const task = await createTask(`2026-10-03T11:${String(minute).padStart(2, "0")}:00.000Z`, `canary-${kind}`);
-      await consumeMessage({ db: env.DB, task, queueAttempts: 1, adapters: { [task.adapterId]: adapter([{ kind, message: "private upstream detail" }]) }, maxAttempts: 4 });
+      expect(await consumeMessage({ db: env.DB, task, queueAttempts: 1, adapters: { [task.adapterId]: adapter([{ kind, message: "private upstream detail" }]) }, maxAttempts: 4 }))
+        .toMatchObject(kind === "retryable" ? { action: "retry", outcome: "retryable" } : { action: "ack", outcome: "terminal", reason: kind });
       expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM source_canary_samples WHERE task_id = ?").bind(task.id).first()).toEqual({ count: 0 });
       expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operational_events WHERE task_id = ? AND event_type = 'source_canary'").bind(task.id).first()).toEqual({ count: 0 });
     },
@@ -161,6 +163,77 @@ describe("persistent queue lifecycle", () => {
     expect(JSON.stringify(stored.results)).not.toContain("secret-like response");
     expect(JSON.stringify(stored.results)).toContain("httpStatus\\\":429");
     expect(await getSourceHealth(env.DB, "throttle-test")).toMatchObject({ consecutiveFailures: 1 });
+  });
+
+  it.each([
+    ["sample", 1, "00"], ["sample", 4, "10"], ["event", 1, "20"], ["event", 4, "30"],
+  ] as const)("completes after %s persistence fails on queue attempt %s without collecting again", async (stage, queueAttempts, minute) => {
+    const task = await createTask(`2026-10-03T13:${minute}:00.000Z`, `canary-write-${stage}-${queueAttempts}`);
+    const logger = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const trigger = stage === "sample"
+      ? "CREATE TRIGGER fail_canary_write BEFORE INSERT ON source_canary_samples BEGIN SELECT RAISE(ABORT, 'private canary database failure'); END"
+      : "CREATE TRIGGER fail_canary_write BEFORE INSERT ON operational_events WHEN NEW.event_type = 'source_canary' BEGIN SELECT RAISE(ABORT, 'private canary database failure'); END";
+    await env.DB.prepare(trigger).run();
+    let calls = 0;
+    const once = adapter();
+    const counting: SourceAdapter = { ...once, async discover(value) { calls += 1; return once.discover(value); } };
+    try {
+      expect(await consumeMessage({ db: env.DB, task, queueAttempts, adapters: { [task.adapterId]: counting }, maxAttempts: 4 }))
+        .toEqual({ action: "ack", outcome: "completed" });
+      expect(await env.DB.prepare("SELECT status, last_error_kind, terminal_reason FROM discovery_tasks WHERE id = ?").bind(task.id).first())
+        .toEqual({ status: "completed", last_error_kind: null, terminal_reason: null });
+      expect(await getSourceHealth(env.DB, task.adapterId)).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
+      expect(await consumeMessage({ db: env.DB, task, queueAttempts: queueAttempts + 1, adapters: { [task.adapterId]: counting }, maxAttempts: 4 }))
+        .toEqual({ action: "ack", outcome: "already_terminal" });
+      expect(calls).toBe(1);
+      expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operational_events WHERE task_id = ? AND event_type IN ('task_retryable_failure', 'task_terminal', 'source_canary')")
+        .bind(task.id).first()).toEqual({ count: 0 });
+      expect(logger.mock.calls).toEqual([[JSON.stringify({ event: "source_canary_persistence_failed" })]]);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER fail_canary_write").run();
+      logger.mockRestore();
+    }
+  });
+
+  it("updates an interrupted task's canary sample and event from anomalous zero to healthy on recovered execution", async () => {
+    const now = new Date("2026-10-03T14:00:00.000Z");
+    const sourceKey = "recovered-canary-source";
+    const policy = { minimumBaselineSamples: 1, baselineWindow: 1, anomalyAtOrBelow: 0 };
+    await recordSourceCanary(env.DB, {
+      sourceKey, taskId: "recovery-baseline", roundId: "baseline-round", observedCount: 10, policy,
+      now: new Date(now.getTime() - 60_000),
+    });
+    const task = await createTask(now.toISOString(), "recovered-canary-adapter");
+    let calls = 0;
+    const once = adapter();
+    const recovering: SourceAdapter = { ...once, async discover(value) {
+      calls += 1;
+      const result = await once.discover(value);
+      return { ...result, observations: calls === 1 ? [] : result.observations };
+    } };
+    const input = { db: env.DB, task, adapters: { [task.adapterId]: recovering }, maxAttempts: 4, sourceHealthKey: sourceKey, canaryPolicy: policy };
+    await env.DB.prepare("CREATE TRIGGER interrupt_canary_task BEFORE UPDATE ON discovery_tasks WHEN NEW.status = 'completed' BEGIN SELECT RAISE(ABORT, 'simulated interruption after canary'); END").run();
+    try {
+      expect(await consumeMessage({ ...input, queueAttempts: 1, now })).toMatchObject({ action: "retry", outcome: "retryable" });
+    } finally {
+      await env.DB.prepare("DROP TRIGGER interrupt_canary_task").run();
+    }
+    const first = await env.DB.prepare("SELECT payload_json FROM operational_events WHERE event_key = ?")
+      .bind(`task:${task.id}:canary`).first<{ payload_json: string }>();
+    expect(JSON.parse(first!.payload_json)).toMatchObject({ state: "anomalous", count: 0 });
+    await env.DB.prepare("UPDATE discovery_tasks SET status = 'running', lease_token = 'expired', lease_expires_at = ? WHERE id = ?")
+      .bind(new Date(now.getTime() + 5 * 60_000).toISOString(), task.id).run();
+    expect(await consumeMessage({ ...input, queueAttempts: 2, now: new Date(now.getTime() + 6 * 60_000) }))
+      .toEqual({ action: "ack", outcome: "completed" });
+    expect(calls).toBe(2);
+    expect(await env.DB.prepare("SELECT observed_count FROM source_canary_samples WHERE task_id = ?").bind(task.id).all())
+      .toMatchObject({ results: [{ observed_count: 1 }] });
+    const current = await env.DB.prepare("SELECT payload_json, adapter_id FROM operational_events WHERE event_key = ?")
+      .bind(`task:${task.id}:canary`).all<{ payload_json: string; adapter_id: string }>();
+    expect(current.results).toHaveLength(1);
+    expect(current.results[0].adapter_id).toBe(task.adapterId);
+    expect(JSON.parse(current.results[0].payload_json)).toEqual({ sourceKey, state: "healthy", count: 1, baselineMedian: 10, sampleSize: 1 });
+    expect(await getSourceHealth(env.DB, sourceKey)).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
   });
 
   it("opens a shared source circuit immediately after throttling and prevents another request", async () => {

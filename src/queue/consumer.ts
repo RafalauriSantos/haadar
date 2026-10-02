@@ -167,29 +167,34 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       };
     }
 
-    const canary = await recordSourceCanary(input.db, {
-      sourceKey: sourceHealthKey,
-      taskId: input.task.id,
-      roundId: input.task.roundId,
-      observedCount: adapterResult.observations.length,
-      policy: input.canaryPolicy ?? defaultSourceCanaryPolicy,
-      now,
-    });
-    await recordOperationalEvent(input.db, {
-      eventKey: `task:${input.task.id}:canary`,
-      eventType: "source_canary",
-      roundId: input.task.roundId,
-      taskId: input.task.id,
-      queryId: input.task.queryId,
-      adapterId: input.task.adapterId,
-      payload: {
+    try {
+      const canary = await recordSourceCanary(input.db, {
         sourceKey: sourceHealthKey,
-        state: canary.state,
-        count: canary.observedCount,
-        baselineMedian: canary.baselineMedian,
-        sampleSize: canary.sampleSize,
-      },
-    });
+        taskId: input.task.id,
+        roundId: input.task.roundId,
+        observedCount: adapterResult.observations.length,
+        policy: input.canaryPolicy ?? defaultSourceCanaryPolicy,
+        now,
+      });
+      await recordOperationalEvent(input.db, {
+        eventKey: `task:${input.task.id}:canary`,
+        eventType: "source_canary",
+        roundId: input.task.roundId,
+        taskId: input.task.id,
+        queryId: input.task.queryId,
+        adapterId: input.task.adapterId,
+        payload: {
+          sourceKey: sourceHealthKey,
+          state: canary.state,
+          count: canary.observedCount,
+          baselineMedian: canary.baselineMedian,
+          sampleSize: canary.sampleSize,
+        },
+      });
+    } catch {
+      // Observability failures must never retry discovery or open a source circuit.
+      console.warn(JSON.stringify({ event: "source_canary_persistence_failed" }));
+    }
     await finishTask(input.db, {
       taskId: input.task.id,
       leaseToken,

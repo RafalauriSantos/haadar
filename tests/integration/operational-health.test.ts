@@ -83,6 +83,16 @@ describe("operational health and retention", () => {
     expect(JSON.parse(unsafe!.payload_json)).toEqual({ state: "warming", count: 0 });
   });
 
+  it("keeps unrelated operational events immutable when their keys are reused", async () => {
+    const event = { eventKey: "immutable-event", eventType: "adapter_diagnostic", adapterId: "original-adapter", payload: { kind: "blocked" } };
+    await recordOperationalEvent(env.DB, event);
+    await recordOperationalEvent(env.DB, { ...event, adapterId: "changed-adapter", payload: { kind: "retryable" } });
+    await recordOperationalEvent(env.DB, { ...event, eventType: "source_canary", payload: { sourceKey: "source", state: "healthy", count: 10 } });
+    const saved = await env.DB.prepare("SELECT event_type, adapter_id, payload_json FROM operational_events WHERE event_key = ?")
+      .bind(event.eventKey).first<{ event_type: string; adapter_id: string; payload_json: string }>();
+    expect(saved).toEqual({ event_type: "adapter_diagnostic", adapter_id: "original-adapter", payload_json: JSON.stringify({ kind: "blocked" }) });
+  });
+
   it("dry-runs and batches retention without removing decision evidence", async () => {
     await env.DB.batch([
       env.DB.prepare(

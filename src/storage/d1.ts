@@ -281,11 +281,18 @@ function safeOperationalPayload(payload: Record<string, unknown>): Record<string
 }
 
 export async function recordOperationalEvent(db: D1DatabaseLike, event: OperationalEvent): Promise<void> {
+  const conflict = event.eventType === "source_canary"
+    ? `ON CONFLICT(event_key) DO UPDATE SET
+         round_id = excluded.round_id, task_id = excluded.task_id,
+         query_id = excluded.query_id, adapter_id = excluded.adapter_id,
+         payload_json = excluded.payload_json, created_at = excluded.created_at
+       WHERE operational_events.event_type = 'source_canary'`
+    : "ON CONFLICT(event_key) DO NOTHING";
   await db.prepare(
     `INSERT INTO operational_events
       (event_key, event_type, round_id, task_id, query_id, adapter_id, payload_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(event_key) DO NOTHING`,
+     ${conflict}`,
   ).bind(
     event.eventKey,
     event.eventType,
