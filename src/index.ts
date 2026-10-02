@@ -18,7 +18,7 @@ import { getOperationalHealth } from "./observability/health";
 import { createTelegramClient } from "./notifications/telegram";
 import { dispatchOne } from "./notifications/dispatcher";
 import { reconcileConfirmedDeliveries } from "./notifications/reconcile";
-import { runRetention } from "./maintenance/retention";
+import { dailyRetentionPolicy, runRetention } from "./maintenance/retention";
 import { initialQueries } from "./portfolio/query-portfolio";
 import { pilotSources } from "./portfolio/sources";
 import type { SourceDefinition } from "./portfolio/sources";
@@ -175,12 +175,9 @@ const worker = {
         console.error(JSON.stringify({ event: "scheduled_dispatch_failed", errorName }));
       }
     }
-    if (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 0) {
-      await runRetention(env.DB, {
-        operationalEventsDays: 30,
-        obsoleteObservationsDays: 14,
-        batchSize: 100,
-      }, { now: scheduledAt });
+    if (scheduledAt.getUTCHours() === 3 && scheduledAt.getUTCMinutes() === 30) {
+      await runRetention(env.DB, dailyRetentionPolicy, { now: scheduledAt });
+      return;
     }
     if (scheduledAt.getUTCMinutes() === 0) {
       await runDiscoveryRound(env, scheduledAt);

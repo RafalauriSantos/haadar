@@ -30,7 +30,7 @@ export const sourceContracts: Record<SourceDefinition["adapterId"], SourceContra
   greenhouse: publicContract("public_json"),
   "github-issues": publicContract("public_json"),
   gupy: publicContract("public_json"),
-  trampos: publicContract("public_html"),
+  trampos: publicContract("public_json"),
   "google-news-rss": publicContract("public_rss"),
   "linkedin-guest": publicContract("public_html"),
 };

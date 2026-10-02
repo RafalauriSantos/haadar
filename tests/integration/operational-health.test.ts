@@ -178,7 +178,7 @@ describe("operational health and retention", () => {
     ).run();
     const queue = { async sendBatch() {} };
     await worker.scheduled(
-      { scheduledTime: Date.parse("2026-10-08T03:00:00.000Z"), cron: "*/5 * * * *", noRetry() {} } as ScheduledController,
+      { scheduledTime: Date.parse("2026-10-08T03:30:00.000Z"), cron: "*/5 * * * *", noRetry() {} } as ScheduledController,
       { DB: env.DB, HAADAR_DISCOVERY: queue } as never,
       createExecutionContext(),
     );

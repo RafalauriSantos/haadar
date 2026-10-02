@@ -19,7 +19,7 @@ describe("source contract validation", () => {
       });
     }
     expect(sourceContracts.greenhouse.kind).toBe("public_json");
-    expect(sourceContracts.trampos.kind).toBe("public_html");
+    expect(sourceContracts.trampos.kind).toBe("public_json");
     expect(sourceContracts["google-news-rss"].kind).toBe("public_rss");
   });
 
