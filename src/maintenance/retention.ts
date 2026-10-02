@@ -55,12 +55,16 @@ export async function runRetention(
     await db.prepare(`DELETE FROM observations WHERE id IN (${observationIds.results.map(() => "?").join(",")})`)
       .bind(...observationIds.results.map((row) => row.id)).run();
   }
+  let deletedCanarySamples = 0;
   if (canaryTaskIds.results.length > 0) {
-    await db.prepare(`DELETE FROM source_canary_samples WHERE task_id IN (${canaryTaskIds.results.map(() => "?").join(",")})`)
-      .bind(...canaryTaskIds.results.map((row) => row.task_id)).run();
+    const deleted = await db.prepare(
+      `DELETE FROM source_canary_samples WHERE observed_at < ?
+       AND task_id IN (${canaryTaskIds.results.map(() => "?").join(",")})`,
+    ).bind(eventCutoff, ...canaryTaskIds.results.map((row) => row.task_id)).run();
+    deletedCanarySamples = deleted.meta.changes;
   }
   return {
     dryRun: false, operationalEvents: eventIds.results.length, observations: observationIds.results.length,
-    sourceCanarySamples: canaryTaskIds.results.length,
+    sourceCanarySamples: deletedCanarySamples,
   };
 }

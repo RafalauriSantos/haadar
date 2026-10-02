@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { recordSourceCanary } from "../../src/storage/source-canary";
 import { defaultSourceCanaryPolicy } from "../../src/portfolio/source-contract";
+import { runRetention } from "../../src/maintenance/retention";
 
 const now = new Date("2026-10-06T12:00:00.000Z");
 const sourceKey = "shared-upstream";
@@ -91,5 +92,36 @@ describe("persisted source canary", () => {
     await sample("anomaly-task", 0);
     expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM source_health").first()).toEqual({ count: 0 });
     expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operational_events").first()).toEqual({ count: 0 });
+  });
+
+  it("preserves a sample refreshed by replay after retention selected it for deletion", async () => {
+    const expired = new Date("2026-01-01T00:00:00.000Z");
+    await sample("refreshed-task", 10, { now: expired });
+    await sample("expired-task", 20, { now: expired });
+    // Delegate every query to real D1; interleave the actual replay after candidate selection.
+    const interleavedDb = {
+      prepare(query: string) {
+        const statement = env.DB.prepare(query);
+        if (!query.includes("SELECT o.id FROM observations")) return statement;
+        return {
+          bind(...bindings: unknown[]) {
+            return {
+              async all() {
+                await sample("refreshed-task", 11);
+                return statement.bind(...bindings).all();
+              },
+            };
+          },
+        };
+      },
+    } as unknown as D1Database;
+
+    const result = await runRetention(interleavedDb,
+      { operationalEventsDays: 7, obsoleteObservationsDays: 7, batchSize: 10 }, { now });
+    expect(await env.DB.prepare("SELECT observed_count, observed_at FROM source_canary_samples WHERE task_id = ?")
+      .bind("refreshed-task").first()).toEqual({ observed_count: 11, observed_at: now.toISOString() });
+    expect(await env.DB.prepare("SELECT task_id FROM source_canary_samples WHERE task_id = ?")
+      .bind("expired-task").first()).toBeNull();
+    expect(result.sourceCanarySamples).toBe(1);
   });
 });
