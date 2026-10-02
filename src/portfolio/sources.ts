@@ -137,7 +137,7 @@ export const githubIssuesSources: GitHubIssuesSourceDefinition[] = ([
     limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 50 },
     active: true,
   },
-] satisfies GitHubIssuesSourceDefinition[]).map((source, index) => ({ ...source, dispatchDelaySeconds: index * 30 }));
+] satisfies GitHubIssuesSourceDefinition[]).map((source, index) => ({ ...source, dispatchDelaySeconds: index * 30, healthKey: "github-api" }));
 
 export const gupySources: GupySourceDefinition[] = ([
   { id: "gupy:full-stack-junior", adapterId: "gupy", term: "Full Stack Junior", organization: "Gupy", allowedHosts: ["candidates.mcp.api.gupy.io"], fetchStrategy: "board_once", applicableQueryFamilies: ["BROAD", "ROLE", "STACK", "CONTEXT"], limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 20 }, active: true },

@@ -22,6 +22,7 @@ describe("public source contracts", () => {
       }),
     ]));
     expect(githubIssuesSources.map((source) => source.dispatchDelaySeconds)).toEqual([0, 30, 60, 90, 120, 150, 180]);
+    expect(githubIssuesSources.every((source) => source.healthKey === "github-api")).toBe(true);
     expect(gupySources.map((source) => source.dispatchDelaySeconds)).toEqual([0, 30, 60]);
   });
 
@@ -42,5 +43,6 @@ describe("public source contracts", () => {
     expect(linkedinGuestSources.every((source) => source.active)).toBe(true);
     expect(linkedinGuestSources.every((source) => source.limits.maxRequestsPerTask === 1)).toBe(true);
     expect(linkedinGuestSources.map((source) => source.dispatchDelaySeconds)).toEqual([0, 180, 360]);
+    expect(linkedinGuestSources.every((source) => source.healthKey === "linkedin-guest")).toBe(true);
   });
 });

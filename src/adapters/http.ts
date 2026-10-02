@@ -69,6 +69,9 @@ export async function fetchBoundedText(url: string, options: BoundedTextFetchOpt
       if (response.status === 429) {
         throw new AdapterHttpError("throttled", "rate_limited", parseRetryAfter(response.headers.get("retry-after")), response.status);
       }
+      if (response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0") {
+        throw new AdapterHttpError("throttled", "rate_limited", parseRetryAfter(response.headers.get("retry-after")), response.status);
+      }
       if (response.status === 401 || response.status === 403) throw new AdapterHttpError("blocked", `http_${response.status}`, undefined, response.status);
       if (response.status === 404) throw new AdapterHttpError("permanent", "board_not_found", undefined, response.status);
       if (response.status >= 500) throw new AdapterHttpError("retryable", `http_${response.status}`, undefined, response.status);

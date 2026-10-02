@@ -26,6 +26,16 @@ describe("bounded text transport", () => {
     })).rejects.toMatchObject({ kind: "schema_changed", message: "unexpected_content_type" });
   });
 
+  it("classifies an exhausted upstream rate limit returned as 403 as throttling", async () => {
+    await expect(fetchBoundedText("https://www.linkedin.com/jobs", {
+      ...options,
+      fetcher: async () => new Response("rate limit", {
+        status: 403,
+        headers: { "x-ratelimit-remaining": "0", "retry-after": "120" },
+      }),
+    })).rejects.toMatchObject({ kind: "throttled", message: "rate_limited", retryAfterSeconds: 120, httpStatus: 403 });
+  });
+
   it("preserves host and response-size protections", async () => {
     await expect(fetchBoundedText("https://evil.example/jobs", options))
       .rejects.toMatchObject({ kind: "blocked", message: "url_not_allowed" });
