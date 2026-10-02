@@ -203,8 +203,8 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
 }
 
 export function retryDelay(attempts: number, random: () => number): number {
-  const exponential = Math.min(600, 30 * 2 ** Math.max(0, attempts - 1));
-  return Math.min(900, exponential + Math.floor(random() * 30));
+  const exponential = Math.min(1_800, 300 * 2 ** Math.max(0, attempts - 1));
+  return Math.min(1_800, exponential + Math.floor(random() * 30));
 }
 
 async function completeTerminal(

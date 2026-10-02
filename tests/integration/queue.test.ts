@@ -227,9 +227,10 @@ describe("persistent queue lifecycle", () => {
     expect(result.explicitAcks).toContain("valid");
   });
 
-  it("bounds exponential retry delay with jitter", () => {
-    expect(retryDelay(1, () => 0)).toBe(30);
-    expect(retryDelay(50, () => 0.999)).toBeLessThanOrEqual(900);
+  it("spaces transient source retries in minutes and bounds the exponential delay", () => {
+    expect(retryDelay(1, () => 0)).toBe(300);
+    expect(retryDelay(2, () => 0)).toBe(600);
+    expect(retryDelay(50, () => 0.999)).toBeLessThanOrEqual(1_800);
   });
 
   it("routes an active LinkedIn guest task to its adapter factory entry", async () => {
