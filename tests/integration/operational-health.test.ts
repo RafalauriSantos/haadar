@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { getOperationalHealth } from "../../src/observability/health";
 import { runRetention } from "../../src/maintenance/retention";
 import { getDiscoveryMetrics } from "../../src/observability/metrics";
+import { recordOperationalEvent } from "../../src/storage/d1";
 import worker from "../../src/index";
 
 const now = new Date("2026-10-06T12:00:00.000Z");
@@ -33,12 +34,53 @@ describe("operational health and retention", () => {
     expect(summary).toMatchObject({
       budgetState: "CONSERVATIVE",
       failingAdapters: 1,
+      anomalousSources: 0,
       oldestQueuedWork: "2026-10-06T10:30:00.000Z",
       notificationHealth: "unknown",
       expiredLeases: 0,
       pausedSources: 0,
       deliveryBacklog: 0,
     });
+  });
+
+  it("counts distinct anomalous source keys within 24 hours separately from adapter failures", async () => {
+    const initial = await getOperationalHealth(env.DB, now);
+    const events = [
+      ["canary-a-1", "source_canary", "shared-a", "anomalous", "2026-10-06T10:00:00.000Z"],
+      ["canary-a-2", "source_canary", "shared-a", "anomalous", "2026-10-06T11:00:00.000Z"],
+      ["canary-b", "source_canary", "source-b", "anomalous", "2026-10-05T12:00:00.000Z"],
+      ["canary-healthy", "source_canary", "healthy-source", "healthy", "2026-10-06T11:00:00.000Z"],
+      ["canary-warming", "source_canary", "warming-source", "warming", "2026-10-06T11:00:00.000Z"],
+      ["canary-old", "source_canary", "old-source", "anomalous", "2026-10-05T11:59:59.999Z"],
+      ["failure", "adapter_diagnostic", "failing-source", "anomalous", "2026-10-06T11:00:00.000Z"],
+    ];
+    await env.DB.batch(events.map(([key, type, source, state, createdAt]) => env.DB.prepare(
+      "INSERT INTO operational_events (event_key, event_type, adapter_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).bind(key, type, `adapter-${key}`, JSON.stringify({ sourceKey: source, state, count: 0, baselineMedian: 10, sampleSize: 3 }), createdAt)));
+    expect(await getOperationalHealth(env.DB, now)).toMatchObject({ anomalousSources: 2, failingAdapters: initial.failingAdapters + 1, pausedSources: 0 });
+    const response = await worker.fetch(new Request("https://haadar.test/health/operations", {
+      headers: { authorization: "Bearer health-token" },
+    }), { DB: env.DB, OPERATIONS_TOKEN: "health-token" }, createExecutionContext());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty("anomalousSources");
+  });
+
+  it("persists only finite numeric canary baseline metadata and omits upstream details", async () => {
+    await recordOperationalEvent(env.DB, {
+      eventKey: "canary-safe-payload", eventType: "source_canary", adapterId: "safe-source",
+      payload: { sourceKey: "safe-source", state: "healthy", count: 4, baselineMedian: 10, sampleSize: 3,
+        url: "https://private.example", body: "private response", message: "private detail" },
+    });
+    const saved = await env.DB.prepare("SELECT payload_json FROM operational_events WHERE event_key = 'canary-safe-payload'")
+      .first<{ payload_json: string }>();
+    expect(JSON.parse(saved!.payload_json)).toEqual({ sourceKey: "safe-source", state: "healthy", count: 4, baselineMedian: 10, sampleSize: 3 });
+    await recordOperationalEvent(env.DB, {
+      eventKey: "canary-unsafe-baseline", eventType: "source_canary", adapterId: "safe-source",
+      payload: { sourceKey: "https://private.example", state: "warming", count: 0, baselineMedian: "private upstream text", sampleSize: Infinity },
+    });
+    const unsafe = await env.DB.prepare("SELECT payload_json FROM operational_events WHERE event_key = 'canary-unsafe-baseline'")
+      .first<{ payload_json: string }>();
+    expect(JSON.parse(unsafe!.payload_json)).toEqual({ state: "warming", count: 0 });
   });
 
   it("dry-runs and batches retention without removing decision evidence", async () => {

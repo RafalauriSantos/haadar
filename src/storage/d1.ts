@@ -258,12 +258,22 @@ export interface OperationalEvent {
   payload: Record<string, unknown>;
 }
 
-const operationalPayloadKeys = new Set(["kind", "reason", "errorKind", "attempts", "count", "state", "httpStatus"]);
+const operationalPayloadKeys = new Set(["kind", "reason", "errorKind", "attempts", "count", "state", "httpStatus", "baselineMedian", "sampleSize", "sourceKey"]);
 
 function safeOperationalPayload(payload: Record<string, unknown>): Record<string, string | number | boolean | null> {
   const safe: Record<string, string | number | boolean | null> = {};
   for (const [key, value] of Object.entries(payload)) {
     if (!operationalPayloadKeys.has(key)) continue;
+    if (key === "baselineMedian" || key === "sampleSize") {
+      if (typeof value === "number" && Number.isFinite(value)) safe[key] = value;
+      if (key === "baselineMedian" && value === null) safe[key] = null;
+      continue;
+    }
+    if (key === "sourceKey") {
+      // Source keys are bounded config identifiers, never upstream URLs or free text.
+      if (typeof value === "string" && /^(?!.*:\/\/)[A-Za-z0-9][A-Za-z0-9:_.\/-]{0,119}$/.test(value)) safe[key] = value;
+      continue;
+    }
     if (value === null || typeof value === "number" || typeof value === "boolean") safe[key] = value;
     if (typeof value === "string") safe[key] = value.slice(0, 120);
   }

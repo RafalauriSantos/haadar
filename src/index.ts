@@ -220,6 +220,7 @@ const worker = {
           alertChannel: parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? "telegram" : undefined,
           alertDestinationKey: parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? env.TELEGRAM_DESTINATION : undefined,
           sourceHealthKey: source?.healthKey,
+          canaryPolicy: source?.canaryPolicy,
         });
         if (parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
           await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION));

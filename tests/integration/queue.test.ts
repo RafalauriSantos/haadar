@@ -1,12 +1,14 @@
 import { env } from "cloudflare:workers";
 import { createExecutionContext, createMessageBatch, getQueueResult } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AdapterDiagnostic, SourceAdapter } from "../../src/adapters/adapter";
 import { admitRound } from "../../src/discovery/round-coordinator";
 import { markTaskPublished } from "../../src/storage/d1";
 import worker, { createAdapters } from "../../src/index";
 import { consumeMessage, retryDelay } from "../../src/queue/consumer";
-import { linkedinGuestSources } from "../../src/portfolio/sources";
+import { greenhouseSources, linkedinGuestSources } from "../../src/portfolio/sources";
+import { defaultSourceCanaryPolicy } from "../../src/portfolio/source-contract";
+import { recordSourceCanary } from "../../src/storage/source-canary";
 import { parseMessage } from "../../src/queue/messages";
 import { getSourceHealth, recordSourceTerminalFailure } from "../../src/storage/source-health";
 
@@ -57,6 +59,81 @@ describe("persistent queue lifecycle", () => {
     expect((await consumeMessage({ db: env.DB, task, queueAttempts: 1, adapters: { test: counting }, maxAttempts: 4 })).outcome).toBe("completed");
     expect((await consumeMessage({ db: env.DB, task, queueAttempts: 2, adapters: { test: counting }, maxAttempts: 4 })).outcome).toBe("already_terminal");
     expect(calls).toBe(1);
+    expect(await env.DB.prepare("SELECT source_key, observed_count FROM source_canary_samples WHERE task_id = ?")
+      .bind(task.id).all()).toMatchObject({ results: [{ source_key: "test", observed_count: 1 }] });
+    const events = await env.DB.prepare("SELECT event_key, adapter_id, payload_json FROM operational_events WHERE task_id = ? AND event_type = 'source_canary'")
+      .bind(task.id).all<{ event_key: string; adapter_id: string; payload_json: string }>();
+    expect(events.results).toHaveLength(1);
+    expect(events.results[0]).toMatchObject({ event_key: `task:${task.id}:canary`, adapter_id: "test" });
+    expect(JSON.parse(events.results[0].payload_json)).toEqual({ sourceKey: "test", state: "warming", count: 1, baselineMedian: null, sampleSize: 0 });
+  });
+
+  it("records an empty successful result against the shared baseline without pausing its source", async () => {
+    const now = new Date("2026-10-03T10:00:00.000Z");
+    const policy = { minimumBaselineSamples: 2, baselineWindow: 2, anomalyAtOrBelow: 0 };
+    for (const [index, count] of [8, 12].entries()) {
+      await recordSourceCanary(env.DB, {
+        sourceKey: "shared-upstream", taskId: `shared-baseline-${index}`, roundId: "baseline-round",
+        observedCount: count, policy, now: new Date(now.getTime() - (2 - index) * 60_000),
+      });
+    }
+    const task = await createTask(now.toISOString(), "empty-board");
+    let calls = 0;
+    const empty: SourceAdapter = { id: "empty-board", async discover() {
+      calls += 1;
+      return { sourceId: "empty-board", observations: [], diagnostics: [] };
+    } };
+    expect(await consumeMessage({
+      db: env.DB, task, queueAttempts: 1, adapters: { "empty-board": empty }, maxAttempts: 4,
+      sourceHealthKey: "shared-upstream", canaryPolicy: policy, now,
+    })).toEqual({ action: "ack", outcome: "completed" });
+    expect(calls).toBe(1);
+    expect(await env.DB.prepare("SELECT source_key, observed_count FROM source_canary_samples WHERE task_id = ?")
+      .bind(task.id).first()).toEqual({ source_key: "shared-upstream", observed_count: 0 });
+    const event = await env.DB.prepare("SELECT adapter_id, payload_json FROM operational_events WHERE task_id = ? AND event_type = 'source_canary'")
+      .bind(task.id).first<{ adapter_id: string; payload_json: string }>();
+    expect(event?.adapter_id).toBe("empty-board");
+    expect(JSON.parse(event!.payload_json)).toEqual({ sourceKey: "shared-upstream", state: "anomalous", count: 0, baselineMedian: 10, sampleSize: 2 });
+    expect(await getSourceHealth(env.DB, "shared-upstream")).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
+  });
+
+  it.each(["permanent", "blocked", "schema_changed", "retryable", "throttled"] as const)(
+    "does not record a canary for a %s diagnostic", async (kind) => {
+      const minute = ["permanent", "blocked", "schema_changed", "retryable", "throttled"].indexOf(kind) * 10;
+      const task = await createTask(`2026-10-03T11:${String(minute).padStart(2, "0")}:00.000Z`, `canary-${kind}`);
+      await consumeMessage({ db: env.DB, task, queueAttempts: 1, adapters: { [task.adapterId]: adapter([{ kind, message: "private upstream detail" }]) }, maxAttempts: 4 });
+      expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM source_canary_samples WHERE task_id = ?").bind(task.id).first()).toEqual({ count: 0 });
+      expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM operational_events WHERE task_id = ? AND event_type = 'source_canary'").bind(task.id).first()).toEqual({ count: 0 });
+    },
+  );
+
+  it("uses the configured canary policy in the Worker queue without another upstream request", async () => {
+    const source = greenhouseSources[0];
+    const originalPolicy = source.canaryPolicy;
+    const originalHealthKey = source.healthKey;
+    source.canaryPolicy = { minimumBaselineSamples: 1, baselineWindow: 1, anomalyAtOrBelow: 0 };
+    source.healthKey = "greenhouse-shared-test";
+    const fetcher = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ jobs: [] }));
+    try {
+      await recordSourceCanary(env.DB, {
+        sourceKey: source.healthKey, taskId: "worker-canary-baseline", roundId: "baseline-round",
+        observedCount: 10, policy: defaultSourceCanaryPolicy, now: new Date(),
+      });
+      const task = await createTask("2026-10-03T12:00:00.000Z", source.id);
+      const batch = createMessageBatch("haadar-discovery", [{ id: "worker-canary", timestamp: new Date(), attempts: 1, body: task }]);
+      const ctx = createExecutionContext();
+      await worker.queue(batch, { DB: env.DB }, ctx);
+      expect((await getQueueResult(batch, ctx)).explicitAcks).toContain("worker-canary");
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      const event = await env.DB.prepare("SELECT adapter_id, payload_json FROM operational_events WHERE task_id = ? AND event_type = 'source_canary'")
+        .bind(task.id).first<{ adapter_id: string; payload_json: string }>();
+      expect(event?.adapter_id).toBe(source.id);
+      expect(JSON.parse(event!.payload_json)).toEqual({ sourceKey: source.healthKey, state: "anomalous", count: 0, baselineMedian: 10, sampleSize: 1 });
+    } finally {
+      source.canaryPolicy = originalPolicy;
+      source.healthKey = originalHealthKey;
+      fetcher.mockRestore();
+    }
   });
 
   it("uses actual Queue attempts for throttling and terminal exhaustion", async () => {

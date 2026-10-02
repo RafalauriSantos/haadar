@@ -4,6 +4,7 @@ export interface OperationalHealthSummary {
   roundsLast24Hours: { expected: number; observed: number; terminal: number; missing: number };
   budgetState: string | null;
   failingAdapters: number;
+  anomalousSources: number;
   oldestQueuedWork: string | null;
   expiredLeases: number;
   pausedSources: number;
@@ -21,13 +22,18 @@ export async function getOperationalHealth(db: D1Database, now = new Date()): Pr
      WHERE status IN ('completed', 'partial', 'deferred')
      ORDER BY updated_at DESC LIMIT 1`,
   ).first<{ id: string; status: "completed" | "partial" | "deferred"; updated_at: string }>();
-  const [observed, terminal, latestBudget, failingAdapters, oldestQueued, expiredLeases, pausedSources, pendingAlerts, failedAlerts, sentAlerts, deliveryBacklog] = await Promise.all([
+  const [observed, terminal, latestBudget, failingAdapters, anomalousSources, oldestQueued, expiredLeases, pausedSources, pendingAlerts, failedAlerts, sentAlerts, deliveryBacklog] = await Promise.all([
     db.prepare("SELECT COUNT(*) AS count FROM discovery_rounds WHERE scheduled_at >= ?").bind(windowStart).first<CountRow>(),
     db.prepare("SELECT COUNT(*) AS count FROM discovery_rounds WHERE scheduled_at >= ? AND status IN ('completed', 'partial', 'deferred')").bind(windowStart).first<CountRow>(),
     db.prepare("SELECT budget_state FROM discovery_rounds ORDER BY scheduled_at DESC LIMIT 1").first<{ budget_state: string }>(),
     db.prepare(
       `SELECT COUNT(DISTINCT adapter_id) AS count FROM operational_events
        WHERE created_at >= ? AND event_type IN ('adapter_diagnostic', 'task_retryable_failure', 'task_terminal')`,
+    ).bind(windowStart).first<CountRow>(),
+    db.prepare(
+      `SELECT COUNT(DISTINCT json_extract(payload_json, '$.sourceKey')) AS count FROM operational_events
+       WHERE created_at >= ? AND event_type = 'source_canary'
+         AND json_extract(payload_json, '$.state') = 'anomalous'`,
     ).bind(windowStart).first<CountRow>(),
     db.prepare(
       `SELECT MIN(created_at) AS created_at FROM discovery_tasks
@@ -57,6 +63,7 @@ export async function getOperationalHealth(db: D1Database, now = new Date()): Pr
     roundsLast24Hours: { expected, observed: observed?.count ?? 0, terminal: terminal?.count ?? 0, missing: Math.max(0, expected - (observed?.count ?? 0)) },
     budgetState: latestBudget?.budget_state ?? null,
     failingAdapters: failingAdapters?.count ?? 0,
+    anomalousSources: anomalousSources?.count ?? 0,
     oldestQueuedWork: oldestQueued?.created_at ?? null,
     expiredLeases: expiredLeases?.count ?? 0,
     pausedSources: pausedSources?.count ?? 0,
