@@ -15,6 +15,8 @@ interface SourceDefinitionBase {
   limits: SourceLimits;
   active: boolean;
   dispatchDelaySeconds?: number;
+  /** A shared upstream contract can stop all related requests after a failure. */
+  healthKey?: string;
 }
 
 export interface GreenhouseSourceDefinition extends SourceDefinitionBase {
@@ -169,6 +171,7 @@ export const linkedinGuestSources: LinkedInGuestSourceDefinition[] = [
   limits: { timeoutMs: 10_000, maxResponseBytes: 512 * 1024, maxRequestsPerTask: 1, maxRecords: 25 },
   active: true,
   dispatchDelaySeconds: index * 180,
+  healthKey: "linkedin-guest",
 }));
 
 export const pilotSources: SourceDefinition[] = [...greenhouseSources, ...githubIssuesSources, ...gupySources, ...tramposSources, ...rssSources, ...linkedinGuestSources];

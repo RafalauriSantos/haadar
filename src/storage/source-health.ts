@@ -7,6 +7,8 @@ export interface SourceHealth {
 
 const FAILURE_THRESHOLD = 3;
 const PAUSE_MS = 6 * 60 * 60_000;
+const THROTTLE_PAUSE_MS = 3 * 60 * 60_000;
+const CONTRACT_PAUSE_MS = 24 * 60 * 60_000;
 
 export async function getSourceHealth(db: D1Database, sourceId: string): Promise<SourceHealth | null> {
   const row = await db.prepare(
@@ -43,20 +45,27 @@ export async function recordSourceTerminalFailure(
   failureKind: string,
   now: Date,
 ): Promise<SourceHealth> {
-  const pauseCandidate = new Date(now.getTime() + PAUSE_MS).toISOString();
+  const immediatePause = failureKind === "throttled" || failureKind === "blocked" || failureKind === "schema_changed";
+  const pauseMs = failureKind === "throttled"
+    ? THROTTLE_PAUSE_MS
+    : failureKind === "blocked" || failureKind === "schema_changed"
+      ? CONTRACT_PAUSE_MS
+      : PAUSE_MS;
+  const pauseCandidate = new Date(now.getTime() + pauseMs).toISOString();
+  const initialPause = immediatePause ? pauseCandidate : null;
   const row = await db.prepare(
     `INSERT INTO source_health (source_id, consecutive_failures, last_failure_kind, paused_until, updated_at)
-     VALUES (?, 1, ?, NULL, ?)
+     VALUES (?, 1, ?, ?, ?)
      ON CONFLICT(source_id) DO UPDATE SET
        consecutive_failures = source_health.consecutive_failures + 1,
        last_failure_kind = excluded.last_failure_kind,
        paused_until = CASE
-         WHEN source_health.consecutive_failures + 1 >= ? THEN ?
+         WHEN ? = 1 OR source_health.consecutive_failures + 1 >= ? THEN ?
          ELSE NULL
        END,
        updated_at = excluded.updated_at
      RETURNING source_id, consecutive_failures, paused_until, last_failure_kind`,
-  ).bind(sourceId, failureKind, now.toISOString(), FAILURE_THRESHOLD, pauseCandidate).first<{
+  ).bind(sourceId, failureKind, initialPause, now.toISOString(), immediatePause ? 1 : 0, FAILURE_THRESHOLD, pauseCandidate).first<{
     source_id: string;
     consecutive_failures: number;
     paused_until: string | null;

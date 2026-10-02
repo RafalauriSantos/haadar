@@ -8,7 +8,7 @@ import { evaluateAndPersist } from "../decision/pipeline";
 import { initialQueries } from "../portfolio/query-portfolio";
 import { defaultRelevanceProfile } from "../portfolio/sources";
 import type { EnrichmentWorkflowParams } from "../workflows/enrichment";
-import { recordSourceSuccess, recordSourceTerminalFailure } from "../storage/source-health";
+import { getSourceHealth, recordSourceSuccess, recordSourceTerminalFailure } from "../storage/source-health";
 
 export type ConsumeAction =
   | { action: "ack"; outcome: "completed" | "terminal" | "already_terminal"; reason?: string }
@@ -26,6 +26,8 @@ export interface ConsumerInput {
   enrichmentWorkflow?: Workflow<EnrichmentWorkflowParams>;
   alertChannel?: string;
   alertDestinationKey?: string;
+  /** Multiple tasks that share an upstream contract can share one circuit. */
+  sourceHealthKey?: string;
 }
 
 export async function consumeMessage(input: ConsumerInput): Promise<ConsumeAction> {
@@ -58,6 +60,12 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
   if (!adapter) {
     await completeTerminal(input, leaseToken, now, "missing_adapter");
     return { action: "ack", outcome: "terminal", reason: "missing_adapter" };
+  }
+  const sourceHealthKey = input.sourceHealthKey ?? input.task.adapterId;
+  const health = await getSourceHealth(input.db, sourceHealthKey);
+  if (health?.pausedUntil && health.pausedUntil > now.toISOString()) {
+    await completeTerminal(input, leaseToken, now, "source_paused", undefined, sourceHealthKey, false);
+    return { action: "ack", outcome: "terminal", reason: "source_paused" };
   }
 
   try {
@@ -126,7 +134,7 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       item.kind === "permanent" || item.kind === "blocked" || item.kind === "schema_changed"
     )?.kind;
     if (terminalKind) {
-      await completeTerminal(input, leaseToken, now, terminalKind);
+      await completeTerminal(input, leaseToken, now, terminalKind, undefined, sourceHealthKey);
       return { action: "ack", outcome: "terminal", reason: terminalKind };
     }
 
@@ -134,8 +142,12 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       item.kind === "retryable" || item.kind === "throttled"
     )?.kind;
     if (retryKind) {
+      if (retryKind === "throttled") {
+        await completeTerminal(input, leaseToken, now, "throttled", retryKind, sourceHealthKey);
+        return { action: "ack", outcome: "terminal", reason: "throttled" };
+      }
       if (input.queueAttempts >= input.maxAttempts) {
-        await completeTerminal(input, leaseToken, now, "attempts_exhausted", retryKind);
+        await completeTerminal(input, leaseToken, now, "attempts_exhausted", retryKind, sourceHealthKey);
         return { action: "ack", outcome: "terminal", reason: "attempts_exhausted" };
       }
       await finishTask(input.db, {
@@ -158,12 +170,12 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       status: "completed",
       now: now.toISOString(),
     });
-    await recordSourceSuccess(input.db, input.task.adapterId, now);
+    await recordSourceSuccess(input.db, sourceHealthKey, now);
     return { action: "ack", outcome: "completed" };
   } catch (error) {
     const errorKind = error instanceof Error ? error.name : "UnknownError";
     if (input.queueAttempts >= input.maxAttempts) {
-      await completeTerminal(input, leaseToken, now, "attempts_exhausted", errorKind);
+      await completeTerminal(input, leaseToken, now, "attempts_exhausted", errorKind, sourceHealthKey);
       return { action: "ack", outcome: "terminal", reason: "attempts_exhausted" };
     }
     await finishTask(input.db, {
@@ -201,6 +213,8 @@ async function completeTerminal(
   now: Date,
   reason: string,
   errorKind?: string,
+  sourceHealthKey = input.task.adapterId,
+  recordHealth = true,
 ): Promise<void> {
   await finishTask(input.db, {
     taskId: input.task.id,
@@ -219,7 +233,8 @@ async function completeTerminal(
     adapterId: input.task.adapterId,
     payload: { reason, errorKind: errorKind ?? null },
   });
-  const health = await recordSourceTerminalFailure(input.db, input.task.adapterId, errorKind ?? reason, now);
+  if (!recordHealth) return;
+  const health = await recordSourceTerminalFailure(input.db, sourceHealthKey, errorKind ?? reason, now);
   if (health.pausedUntil) {
     await recordOperationalEvent(input.db, {
       eventKey: `source:${input.task.adapterId}:paused:${health.pausedUntil}`,

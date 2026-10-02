@@ -60,49 +60,76 @@ describe("persistent queue lifecycle", () => {
   });
 
   it("uses actual Queue attempts for throttling and terminal exhaustion", async () => {
-    const retryTask = await createTask("2026-10-03T01:30:00.000Z", "test");
+    const retryTask = await createTask("2026-10-03T01:30:00.000Z", "throttle-test");
     const retry = await consumeMessage({
       db: env.DB,
       task: retryTask,
       queueAttempts: 2,
-      adapters: { test: adapter([{ kind: "throttled", message: "remote body must not persist", httpStatus: 429 }]) },
+      adapters: { "throttle-test": adapter([{ kind: "throttled", message: "remote body must not persist", httpStatus: 429 }]) },
       maxAttempts: 4,
       random: () => 0,
     });
-    expect(retry).toEqual({ action: "retry", outcome: "retryable", delaySeconds: 60 });
+    expect(retry).toEqual({ action: "ack", outcome: "terminal", reason: "throttled" });
 
     const terminal = await consumeMessage({
       db: env.DB,
       task: retryTask,
       queueAttempts: 4,
-      adapters: { test: adapter([{ kind: "throttled", message: "secret-like response" }]) },
+      adapters: { "throttle-test": adapter([{ kind: "throttled", message: "secret-like response" }]) },
       maxAttempts: 4,
     });
-    expect(terminal).toMatchObject({ action: "ack", outcome: "terminal", reason: "attempts_exhausted" });
+    expect(terminal).toMatchObject({ action: "ack", outcome: "already_terminal" });
     const stored = await env.DB.prepare("SELECT payload_json FROM operational_events WHERE task_id = ?")
       .bind(retryTask.id).all<{ payload_json: string }>();
     expect(JSON.stringify(stored.results)).not.toContain("secret-like response");
     expect(JSON.stringify(stored.results)).toContain("httpStatus\\\":429");
-    expect(await getSourceHealth(env.DB, "test")).toMatchObject({ consecutiveFailures: 1, pausedUntil: null });
+    expect(await getSourceHealth(env.DB, "throttle-test")).toMatchObject({ consecutiveFailures: 1 });
   });
 
-  it("pauses a repeatedly terminal source, while a successful task clears its failure count", async () => {
-    for (let index = 0; index < 3; index += 1) {
-      const task = await createTask(`2026-10-04T0${index}:00:00.000Z`, "health-source");
-      await consumeMessage({
-        db: env.DB,
-        task,
-        queueAttempts: 1,
-        adapters: { "health-source": adapter([{ kind: "blocked", message: "blocked" }]) },
-        maxAttempts: 4,
-        now: new Date(`2026-10-04T0${index}:00:00.000Z`),
-      });
-    }
-    expect(await getSourceHealth(env.DB, "health-source")).toMatchObject({ consecutiveFailures: 3 });
-    expect(Date.parse((await getSourceHealth(env.DB, "health-source"))!.pausedUntil!)).toBeGreaterThan(Date.parse("2026-10-04T02:00:00.000Z"));
+  it("opens a shared source circuit immediately after throttling and prevents another request", async () => {
+    const first = await createTask("2026-12-03T01:45:00.000Z", "linkedin-java");
+    const throttled = await consumeMessage({
+      db: env.DB,
+      task: first,
+      queueAttempts: 1,
+      adapters: { "linkedin-java": adapter([{ kind: "throttled", message: "rate limited", httpStatus: 429 }]) },
+      maxAttempts: 4,
+      sourceHealthKey: "linkedin-guest",
+      now: new Date("2026-12-03T01:45:00.000Z"),
+    });
+    expect(throttled).toMatchObject({ action: "ack", outcome: "terminal", reason: "throttled" });
+    expect((await getSourceHealth(env.DB, "linkedin-guest"))?.pausedUntil).not.toBeNull();
 
-    const recovered = await createTask("2026-10-04T04:00:00.000Z", "health-source");
-    await consumeMessage({ db: env.DB, task: recovered, queueAttempts: 1, adapters: { "health-source": adapter() }, maxAttempts: 4 });
+    const next = await createTask("2026-12-03T02:46:00.000Z", "linkedin-node");
+    let calls = 0;
+    const result = await consumeMessage({
+      db: env.DB,
+      task: next,
+      queueAttempts: 1,
+      adapters: { "linkedin-node": { ...adapter(), id: "linkedin-node", async discover(task) { calls += 1; return adapter().discover(task); } } },
+      maxAttempts: 4,
+      sourceHealthKey: "linkedin-guest",
+      now: new Date("2026-12-03T02:46:00.000Z"),
+    });
+    expect(result).toMatchObject({ action: "ack", outcome: "terminal", reason: "source_paused" });
+    expect(calls).toBe(0);
+  });
+
+  it("pauses a blocked source immediately, while a later successful task clears its failure count", async () => {
+    const task = await createTask("2026-12-04T00:00:00.000Z", "health-source");
+    await consumeMessage({
+      db: env.DB,
+      task,
+      queueAttempts: 1,
+      adapters: { "health-source": adapter([{ kind: "blocked", message: "blocked" }]) },
+      maxAttempts: 4,
+      now: new Date("2026-12-04T00:00:00.000Z"),
+    });
+    expect(await getSourceHealth(env.DB, "health-source")).toMatchObject({ consecutiveFailures: 1 });
+    expect(Date.parse((await getSourceHealth(env.DB, "health-source"))!.pausedUntil!)).toBeGreaterThan(Date.parse("2026-12-04T00:00:00.000Z"));
+
+    const recovered = await createTask("2026-12-05T01:00:00.000Z", "health-source");
+    await consumeMessage({ db: env.DB, task: recovered, queueAttempts: 1, adapters: { "health-source": adapter() }, maxAttempts: 4, now: new Date("2026-12-05T01:00:00.000Z") });
     expect(await getSourceHealth(env.DB, "health-source")).toMatchObject({ consecutiveFailures: 0, pausedUntil: null });
   });
 
@@ -172,12 +199,13 @@ describe("persistent queue lifecycle", () => {
 
   it.each(["permanent", "blocked", "schema_changed"] as const)("treats %s as terminal", async (kind) => {
     const minute = kind === "permanent" ? "03:00" : kind === "blocked" ? "04:30" : "06:00";
-    const task = await createTask(`2026-10-03T${minute}:00.000Z`, "test");
+    const adapterId = `terminal-${kind}`;
+    const task = await createTask(`2026-10-03T${minute}:00.000Z`, adapterId);
     const result = await consumeMessage({
       db: env.DB,
       task,
       queueAttempts: 1,
-      adapters: { test: adapter([{ kind, message: "detail" }]) },
+      adapters: { [adapterId]: adapter([{ kind, message: "detail" }]) },
       maxAttempts: 4,
     });
     expect(result).toMatchObject({ action: "ack", outcome: "terminal", reason: kind });

@@ -209,6 +209,7 @@ const worker = {
       }
       try {
         const adapters = createAdapters(pilotSources);
+        const source = pilotSources.find((item) => item.id === parsed.value.adapterId);
         const outcome = await consumeMessage({
           db: env.DB,
           task: parsed.value,
@@ -218,6 +219,7 @@ const worker = {
           enrichmentWorkflow: env.ENRICHMENT_WORKFLOW,
           alertChannel: parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? "telegram" : undefined,
           alertDestinationKey: parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION ? env.TELEGRAM_DESTINATION : undefined,
+          sourceHealthKey: source?.healthKey,
         });
         if (parsed.value.deliveryMode !== "silent" && env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_DESTINATION) {
           await dispatchOne(env.DB, createTelegramClient(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_DESTINATION));
