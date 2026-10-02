@@ -17,7 +17,7 @@
 - A canary must reuse the normal collection result; it must never introduce an additional upstream request.
 - Volume anomalies are observational only; they must not pause a source or alter alert delivery.
 - Source health circuits continue to pause terminal/throttled upstream failures only.
-- Operational payloads must not persist response bodies, URLs, credentials, or free-text error details.
+- Operational payloads must not persist response bodies, URLs, credentials, or free-text error details; a validated configured `sourceKey` is permitted solely to group shared upstream health.
 
 ## Review Focus
 
@@ -110,8 +110,8 @@ git commit -m "feat: persist source canary baselines"
 - Modify: `tests/integration/operational-health.test.ts`
 
 **Interfaces:**
-- Each completed source task records exactly one canary sample using `sourceHealthKey ?? task.adapterId`.
-- Emit `source_canary` operational events with only `state`, `count`, and numeric baseline metadata.
+- Each completed source task records one atomic sample-and-event canary snapshot using `sourceHealthKey ?? task.adapterId`; if D1 is unavailable, preserve the core completed task without retrying the upstream source and leave no partial or stale canary evidence.
+- Emit `source_canary` operational events with only `sourceKey`, `state`, `count`, and numeric baseline metadata.
 - Add `anomalousSources` to `OperationalHealthSummary` as the number of distinct source keys with an anomalous canary in the last 24 hours.
 
 - [ ] **Step 1: Write failing queue and health-summary tests**
@@ -124,7 +124,7 @@ Run: `npm test -- --run tests/integration/queue.test.ts tests/integration/operat
 
 - [ ] **Step 3: Integrate canary recording after a successful task completion**
 
-Call the evaluator only after all diagnostics are clear and before returning the completed outcome. Preserve the current terminal/throttle circuit behavior. Record a sanitized event keyed by task ID.
+Call the evaluator only after all diagnostics are clear and before returning the completed outcome. Persist its sample and sanitized event as one task-keyed D1 snapshot. Preserve the current terminal/throttle circuit behavior; on D1 observability failure, log only a constant event name and complete the source task without leaving a partial snapshot.
 
 - [ ] **Step 4: Run focused tests, typecheck, and full test suite**
 
