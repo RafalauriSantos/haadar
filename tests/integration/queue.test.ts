@@ -209,6 +209,9 @@ describe("persistent queue lifecycle", () => {
       maxAttempts: 4,
     });
     expect(result).toMatchObject({ action: "ack", outcome: "terminal", reason: kind });
+    expect(await env.DB.prepare("SELECT terminal_reason, last_error_kind FROM discovery_tasks WHERE id = ?")
+      .bind(task.id).first<{ terminal_reason: string; last_error_kind: string | null }>())
+      .toMatchObject({ terminal_reason: kind, last_error_kind: kind });
   });
 
   it("acknowledges invalid messages and retries a valid failing message independently", async () => {

@@ -134,7 +134,7 @@ export async function consumeMessage(input: ConsumerInput): Promise<ConsumeActio
       item.kind === "permanent" || item.kind === "blocked" || item.kind === "schema_changed"
     )?.kind;
     if (terminalKind) {
-      await completeTerminal(input, leaseToken, now, terminalKind, undefined, sourceHealthKey);
+      await completeTerminal(input, leaseToken, now, terminalKind, terminalKind, sourceHealthKey);
       return { action: "ack", outcome: "terminal", reason: terminalKind };
     }
 
